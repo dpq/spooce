@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Spooce</title>
+    <link rel="icon" type="image/gif" href="/favicon.gif" />
+    <link href="//fonts.googleapis.com/css?family=Crimson+Text:regular&subset=latin" rel="stylesheet" type="text/css" />
+    <style type="text/css">
+    body {
+        font-size: 12px;
+        font-family: 'Verdana', sans-serif;
+        color: black;
+        background-color: white;
+    }
+
+    h1 {
+        font-family: 'Crimson Text', serif;
+        font-size: 116px;
+        font-style: normal;
+        font-weight: 400;
+        text-shadow: 4px 4px 4px #bbb;
+        text-decoration: none;
+        text-transform: none;
+        letter-spacing: 0em;
+        word-spacing: 0em;
+        line-height: 1em;
+        text-align: center;
+    }
+    </style>
+    <script type="text/javascript" src="/script/json2.js"> </script>
+    <script type="text/javascript" src="/script/jquery.js"> </script>
+    <script type="text/javascript" src="/script/jquery-comments.js"> </script>
+    <script type="text/javascript" src="/script/jquery-timers.js"> </script>
+    <script type="text/javascript" src="/script/kernel.js"> </script>
+    <script type="text/javascript" src="/script/opt.js"> </script>
+</head>
+<body>
+<h1>Sp<span style="color:gray">∞</span>ce</h1>
+<hr/>
+
+<h3><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rsstitle", "mode": "edit"}]--></h3>
+<p><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rssp1", "mode": "edit"}]--></p>
+<p style="text-align: center; color: darkred"><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rsspformula", "mode": "edit"}]--></p>
+
+<p><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rssp3", "mode": "edit"}]--></p>
+<p><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rssp4", "mode": "edit"}]--></p>
+<p><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rssp5", "mode": "edit"}]--></p>
+
+<table>
+<tr>
+<td><!--@@[{"appcode": "image", "versioncode": 1}, {"imgid": "rssminutely", "mode": "edit"}]--></td>
+<td><!--@@[{"appcode": "image", "versioncode": 1}, {"imgid": "rsshourly", "mode": "view"}]--></td>
+</tr>
+</table>
+
+<p><!--@@[{"appcode": "text", "versioncode": 1}, {"strid": "rssthanks", "mode": "edit"}]--></p>
+</body>
+
+
+<!--[{"appcode": "text", "versioncode": 1},{"strid": "IDSX_HELLO", "mode": "edit"}]-->
+<!--[{"appcode": "image", "versioncode": 1},{"imgid": "lazorevka.png", "mode": "edit"}]-->
+<!--[{"appcode": "portal", "versioncode": 1},{"boardid": "1"}]-->
+
+
+<!-- IE6 needs an .ico favicon to display, and specially crafted transparent PNG image support -->
+<!--asd [if IE 6]>
+<link rel="icon" type="image/gif" href="style/favicon.ico" />
+<style type="text/css">
+div.blockcontrol {
+    background: transparent url('style/resize_corner.png') no-repeat scroll bottom right;
+}
+
+img {
+    -ms-interpolation-mode:bicubic;
+}
+</style>
+<script type="text/javascript" src="DD_belatedPNG_0.0.8a.js"> </script>
+<script type="text/javascript" src="pngfix_map.js"> </script>
+<script type="text/javascript">
+function ie6init() {
+    DD_belatedPNG.fix("div.blockcontrol");
+    DD_belatedPNG.fix("div#toolbar");
+}
+
+function ie6editorfix() {
+    $(block.childNodes[0]).css("height", $(block).css("height"));
+}
+
+function ie6menufix(mapId) {
+    fix_pngmap(document.getElementById(mapId + "_btn"));
+    document.getElementById(mapId + "_map").onmouseover = function() {
+        PNGswap(mapId + "_btn");
+    };
+    document.getElementById(mapId + "_map").onmouseout = function() {
+        PNGswap(mapId + "_btn");
+    };
+}
+</script>
+<![endif]-->
+<!--
+1) To implement panning, we use native scrolling due to performance considerations (except in IE, where element offset manipulation is superior).
+2) We use native scroll on the viewport, because event.pageX/pageY get buggy when we scroll the body element.
+3) The board is used to intercept mouse events and to provide something to scroll in the viewport. It is 3x3 times the size of the viewport and the viewport is centered on it at all times except when panning, since the user must not be able to pan away from it by dragging the mouse.
+4) The HTML canvas is used to simplify recalculation of object coordinates when we need to simultaneously reposition all of them after panning is complete.
+5) We do not use image area mapping for the resize corner due to various browser quirks that get in the way
+
+<div id="sizeTest" style="display:none;font-size: 10px; position:absolute; width: 10em; height: 10em">ABC</div>
+
+<div id="viewport">
+    <div id="board">
+        <div id="htmlAnchor" style="font-size: 10px"></div>
+    </div>
+</div>-->
+</html>

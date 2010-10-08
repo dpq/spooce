@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OPT Repository</title>
+    <style type="text/css">
+    input {
+        border: 1px solid black;
+    }
+    </style>
+</head>
+<body>
+<h4>Upload your application using this repository web interface:</h4>
+    <form action="/pkg/upload" method="post">
+        <span>Lang:</span><br/>
+        <input type="text" name="lang" />
+        <br/>
+        <span>AppCode:</span><br/>
+        <input type="text" name="appcode" />
+        <br/>
+        <span>VersionCode:</span><br/>
+        <input type="text" name="versioncode" />
+        <br/>
+        <span>Key:</span><br/>
+        <input type="text" name="key" />
+        <br/>
+        <span>Program body:</span><br/>
+        <textarea cols="80" rows="30" name="body"></textarea>
+        <br/>
+        <input type="submit" />
+    </form>
+<h4>Alternatively, you can download the <a href="/pkg/sdk">SDK</a> if you prefer command line interface.</h4>
+</body>
+</html>
