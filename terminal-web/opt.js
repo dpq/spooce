@@ -5,6 +5,7 @@ opt.package = {};
 
 opt.install = function(meta, callback) {
     if (opt.package[meta.appcode] && opt.package[meta.appcode][meta.versioncode]) {
+        callback();
         return;
     }
     if (meta.appcode && meta.versioncode) {
@@ -19,20 +20,13 @@ $(document).bind("ready", function() {
         var placeholders = $("body").comments(true);
         var targets = placeholders[0];
         var entries = placeholders[1];
-        var makeRenderCall = function(target) {
-           return function(appid) {
-               var element = kernel.process[appid].render();
-               target.replaceWith(element);
-               kernel.element[appid] = element;
-           }
-        }
         for (var i in entries) {
             var meta = entries[i][0];
             var args = {};
             if (entries[i].length > 1) {
                 args = entries[i][1];
             }
-            kernel.run(meta, args, makeRenderCall($(targets[i])));
+            kernel.run(meta, args, kernel.renderFactory($(targets[i])));
         }
     });
     $(window).bind("unload", function() {

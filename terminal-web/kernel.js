@@ -6,21 +6,60 @@ kernel.process = {};
 kernel.element = {}
 kernel.messageQueue = [];
 kernel.backupQueue = {};
+kernel.instFlag = {};
+kernel.runQueue = {};
 
+kernel.renderFactory = function(target) {
+   return function(appid) {
+       var element = kernel.process[appid].render();
+       target.replaceWith(element);
+       kernel.element[appid] = element;
+   }
+}
 
 kernel.run = function(meta, args, callback) {
-    opt.install(meta, function() {
-        var appid = kernel.tid + "/";
-        var i;
-        for (i = 0; i<32; i++) {
-            appid += "0123456789abcdef".charAt(Math.floor(Math.random()*16));
+    if (! kernel.runQueue[meta.appcode]) {
+        kernel.runQueue[meta.appcode] = {};
+    }
+    if (! kernel.runQueue[meta.appcode][meta.versioncode]) {
+        kernel.runQueue[meta.appcode][meta.versioncode] = [];
+    }
+    if (! kernel.instFlag[meta.appcode]) {
+        kernel.instFlag[meta.appcode] = {};
+    }
+    if (! kernel.instFlag[meta.appcode][meta.versioncode]) {
+//        alert(meta.appcode + "(v" + meta.versioncode + ".0)" + " is not installed");
+        kernel.instFlag[meta.appcode][meta.versioncode] = 1;
+        opt.install(meta, function() {
+            kernel.instFlag[meta.appcode][meta.versioncode] = 2;
+            kernel.run(meta, args, callback);
+        });
+    }
+    else { // 1 or 2
+//        alert(meta.appcode + "(v" + meta.versioncode + ".0)" + " is being installed")
+        kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
+    }
+    if (kernel.instFlag[meta.appcode][meta.versioncode] == 2) {
+//        alert(meta.appcode + "(v" + meta.versioncode + ".0)" + " is ready to run");
+//        alert(kernel.runQueue[meta.appcode][meta.versioncode]);
+        var i, j, appid, elem;
+        for (var i in kernel.runQueue[meta.appcode][meta.versioncode]) {
+            elem = kernel.runQueue[meta.appcode][meta.versioncode][i];
+//            alert("Starting " + meta.appcode + "(v" + meta.versioncode + ".0) with args " + elem[0])
+            args = elem[0];
+            callback = elem[1];
+            appid = kernel.tid + "/";
+            for (j = 0; j<32; j++) {
+                appid += "0123456789abcdef".charAt(Math.floor(Math.random()*16));
+            }
+            kernel.process[appid] = new opt.package[meta.appcode][meta.versioncode]();
+            kernel.process[appid].__callback = {};
+            kernel.process[appid].main(appid, args);
+            kernel.sendMessage({"src": kernel.tid, "event": "run", "appid": appid});
+//            alert(appid + " has started");
+            callback(appid);
         }
-        kernel.process[appid] = new opt.package[meta.appcode][meta.versioncode]();
-        kernel.process[appid].__callback = {};
-        kernel.process[appid].main(appid, args);
-        kernel.sendMessage({"src": kernel.tid, "event": "run", "appid": appid});
-        callback(appid);
-    });
+    }
 }
 
 
