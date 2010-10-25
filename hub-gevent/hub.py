@@ -228,7 +228,14 @@ class Hub(object):
                 print "Pushed to", "%s_inbox" % tid.encode('utf8')
         else:
             session = Session[domain]()
+            dstlist, filterlist = [], []
             for dst, filter in session.query(Subscription[domain].subscriber, Subscription[domain].filter).filter_by(publisher=message["src"]).all():
+                dstlist.append(dst)
+                filterlist.append(filter)
+            session.close()
+            for i in range(0, len(dstlist)):
+                dst = dstlist[i]
+                filter = filterlist[i]
                 if filter != "":
                     match = True
                     filter = fromjson(filter)
@@ -241,8 +248,6 @@ class Hub(object):
                     message.update({"dst": dst})
                     tid = message["dst"].split("/")[1]
                     self.__push(domain, message, tid)
-            session.commit()
-            session.close()
 
 
     def __pull(self, tid):

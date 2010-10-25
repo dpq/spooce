@@ -28,24 +28,19 @@ kernel.run = function(meta, args, callback) {
         kernel.instFlag[meta.appcode] = {};
     }
     if (! kernel.instFlag[meta.appcode][meta.versioncode]) {
-//        alert(meta.appcode + "(v" + meta.versioncode + ".0)" + " is not installed");
         kernel.instFlag[meta.appcode][meta.versioncode] = 1;
         opt.install(meta, function() {
             kernel.instFlag[meta.appcode][meta.versioncode] = 2;
             kernel.run(meta, args, callback);
         });
     }
-    else { // 1 or 2
-//        alert(meta.appcode + "(v" + meta.versioncode + ".0)" + " is being installed")
+    else {
         kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
     }
     if (kernel.instFlag[meta.appcode][meta.versioncode] == 2) {
-//        alert(meta.appcode + "(v" + meta.versioncode + ".0)" + " is ready to run");
-//        alert(kernel.runQueue[meta.appcode][meta.versioncode]);
         var i, j, appid, elem;
         for (var i in kernel.runQueue[meta.appcode][meta.versioncode]) {
             elem = kernel.runQueue[meta.appcode][meta.versioncode][i];
-//            alert("Starting " + meta.appcode + "(v" + meta.versioncode + ".0) with args " + elem[0])
             args = elem[0];
             callback = elem[1];
             appid = kernel.tid + "/";
@@ -56,7 +51,6 @@ kernel.run = function(meta, args, callback) {
             kernel.process[appid].__callback = {};
             kernel.process[appid].main(appid, args);
             kernel.sendMessage({"src": kernel.tid, "event": "run", "appid": appid});
-//            alert(appid + " has started");
             callback(appid);
         }
     }
@@ -249,3 +243,39 @@ kernel.unsubscribe = function(subscriber, publisher) {
     msg.action = "unsubscribe";
     kernel.sendMessage(msg, callback);
 }
+
+/* OPT is the OPT Packaging Tool */
+var opt = {};
+opt.package = {};
+
+
+opt.install = function(meta, callback) {
+    if (opt.package[meta.appcode] && opt.package[meta.appcode][meta.versioncode]) {
+        callback();
+        return;
+    }
+    if (meta.appcode && meta.versioncode) {
+        $.getScript(kernel.repo + kernel.lang + "/" + meta.appcode + "/" + meta.versioncode, callback);
+    }
+}
+
+
+$(document).bind("ready", function() {
+    kernel.connect(function() {
+        $(document).everyTime(kernel.calibration.interval, "mx", kernel.mx);
+        var placeholders = $("body").comments(true);
+        var targets = placeholders[0];
+        var entries = placeholders[1];
+        for (var i in entries) {
+            var meta = entries[i][0];
+            var args = {};
+            if (entries[i].length > 1) {
+                args = entries[i][1];
+            }
+            kernel.run(meta, args, kernel.renderFactory($(targets[i])));
+        }
+    });
+    $(window).bind("unload", function() {
+        kernel.disconnect();
+    });
+});
