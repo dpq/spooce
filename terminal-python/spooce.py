@@ -65,16 +65,16 @@ class Opt:
         if not self.package[meta[0]].has_key(meta[1]):
             src = kernel.getSource(meta)
             if src != None:
-#                try:
-                if 1:
+                try:
+#                if 1:
                     module = imp.new_module(meta[0])
                     module.__dict__["kernel"] = kernel
                     module.__dict__["opt"] = opt
                     exec src in module.__dict__
                     sys.modules[meta[0]] = module
-#                except:
-#                    log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
-#                    result = False
+                except:
+                    log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
+                    result = False
             else:
                 result = False
         else:
@@ -91,7 +91,10 @@ from datetime import datetime
 
 
 class Kernel:
-    def __init__(self, hubLocation, login, passwd, localrepository):
+    def __init__(self):
+        pass
+
+    def init(self, hubLocation, login, passwd, localrepository):
         self.dtstart = datetime.now()
         #logfile = datetime.now().strftime("logs/%Y%m%d%H%M.spooce.kernel.log")
         #log.basicConfig(filename = logfile, level = log.DEBUG)
@@ -177,6 +180,7 @@ class Kernel:
         print "Running...", meta
         if not opt.install(meta[:2]):
             return False
+        print "opt.package", opt.package
         Args["appcode"] = meta[0]
         Args["versioncode"] = meta[1]
         pid = max(self.process.keys()) + 1
@@ -246,10 +250,10 @@ class Kernel:
         localmsg = []
         while len(mq) > 0:
             m = Message(mq.pop())
-            if m["dst"] != None and m["dst"].strip("/").startswith(self.__ID):
-                localmsg.append(m)
-            else:
-                request.append(m)
+#            if m["dst"] != None and m["dst"].strip("/").startswith(self.__ID):
+#                localmsg.append(m)
+#            else:
+            request.append(m)
         for m in request:
             print "Message for hub :\n", printMsg(m)
 
@@ -366,14 +370,15 @@ class Kernel:
                 log.error("Cannot download the source of %s, %s (lang=%s)" % (appcode, versioncode, self.lang()))
         if len(content) > 0:
             return content.replace("\r", "\n").replace("\n\n", "\n")
-        try:
+#        try:
+        if 1:
             log.info("Getting %s, %s from the file %s" % (appcode, versioncode, self.localrepo + appcode + ".py"))
             sourcefile = open(self.localrepo + appcode + ".py")
             content = sourcefile.read()
             sourcefile.close()
             return content.replace("\r", "\n").replace("\n\n", "\n")
-        except:
-            log.error("Cannot get from file " + self.localrepo + appcode + ".py")
+#        except:
+#            log.error("Cannot get from file " + self.localrepo + appcode + ".py")
         return None
 
     def lang(self):
@@ -384,3 +389,5 @@ class Kernel:
 def printMsg(message):
     for key in message:
         print "\t", key, ":", message[key]
+
+kernel = Kernel()
