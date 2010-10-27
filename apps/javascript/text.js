@@ -10,7 +10,7 @@ opt.package["text"]["1"] = function() {
     var defaultRenderMode = "view";
     var renderMode;
 
-    var defaultServerAddress = "/weraibterminal/ibText";
+    var defaultServerAddress = "/std/text";
     var serverAddress;
 
     this.value = function() {
