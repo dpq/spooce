@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from gevent import monkey; monkey.patch_socket()
 from gevent.wsgi import WSGIServer
+from gevent.coros import RLock
 
 from werkzeug import Request, Response
 from werkzeug.contrib.securecookie import SecureCookie
@@ -24,6 +25,8 @@ from sqlalchemy import Table, Column, MetaData, Index, desc, create_engine
 import secret, default
 
 Session, Terminal, Subscription = {}, {}, {}
+
+locks = {}
 
 def __Terminal_init__(self, tid, key = ""):
     self.tid = tid
@@ -114,6 +117,7 @@ class Hub(object):
             print 'Continuing terminal initialization: %s' % tid.encode('utf8')
             self.mc.set("%s_inbox" % tid.encode('utf8'), "[]")
             self.mc.set("%s_last_seen" % tid.encode('utf8'), str(datetime.now()))
+            locks[tid.encode('utf8')] = RLock()
             mac = hmac.new(secret.SessionSecret[domain], None, hashlib.sha1)
             mac.update(tid)
             self.__push(domain, {"event": "connect", "tid": "/%s" % tid, "src": "/%s" % self.hubid})
@@ -135,8 +139,11 @@ class Hub(object):
             tid = self.__tid(req)
             if not tid:
                 return [tojson({'status': 2, 'errmsg': 'Authentication error.'})]
+            locks[tid.encode('utf8')].acquire()
             self.mc.delete("%s_inbox" % tid.encode('utf8'))
             self.mc.delete("%s_last_seen" % tid.encode('utf8'))
+            locks[tid.encode('utf8')].release()
+            del locks[tid.encode('utf8')]
             if session.query(Terminal[domain]).filter_by(tid=tid).one().key == "" or (req.args.has_key("release") and req.args["release"] == 1):
                 session.delete(session.query(Terminal[domain]).filter_by(tid=tid).one())
             session.commit()
@@ -159,7 +166,9 @@ class Hub(object):
             terminal.last_seen = datetime.now()
             session.commit()
             session.close()
+            locks[tid.encode('utf8')].acquire()
             self.mc.set("%s_last_seen" % tid.encode('utf8'), str(datetime.now()))
+            locks[tid.encode('utf8')].release()
             incoming, outgoing = [], []
             if req.values.has_key('messages'):
                 try:
@@ -211,12 +220,14 @@ class Hub(object):
             print "pulling", tojson(outgoing)
             return [tojson(outgoing)]
         except:
+            print "LOCKS", locks.keys()
             logging.error("__mx failure", exc_info=1)
             return ['[]']
 
 
     def __push(self, domain, message, tid=None):
         if tid:
+            locks[tid.encode('utf8')].acquire()
             try:
                 messages = self.mc.get("%s_inbox" % tid.encode('utf8'))
             except:
@@ -227,7 +238,9 @@ class Hub(object):
                 self.mc.set("%s_inbox" % tid.encode('utf8'), tojson(messages))
                 print "Pushed to", "%s_inbox" % tid.encode('utf8')
             else:
-                logging.error("Malformed inbox, not pushing")
+                logging.error("Malformed inbox, not pushing (%s_inbox)" % tid.encode('utf8'))
+                logging.info("Inbox is %s " % str(messages))
+            locks[tid.encode('utf8')].release()
         else:
             session = Session[domain]()
             dstlist, filterlist = [], []
@@ -253,16 +266,21 @@ class Hub(object):
 
 
     def __pull(self, tid):
+        res = []
+        messages = None
+        locks[tid.encode('utf8')].acquire()
         try:
             messages = self.mc.get("%s_inbox" % tid.encode('utf8'))
-            if messages:
-                self.mc.set("%s_inbox" % tid.encode('utf8'), "[]")
-                return fromjson(messages)
-            else:
-                return []
         except:
             logging.error("__pull failure", exc_info=1)
-            return []
+        if messages:
+            self.mc.set("%s_inbox" % tid.encode('utf8'), "[]")
+            res = fromjson(messages)
+        else:
+            res = []
+            logging.error("Malformed inbox, not pulling (%s_inbox)" % tid.encode('utf8'))
+        locks[tid.encode('utf8')].release()
+        return res
 
 
     def __subscribe(self, domain, sub, pub, filter=""):
@@ -466,6 +484,8 @@ def main():
     hub.mc.set("%s_inbox" % HubID.encode('utf8'), "[]")
     hub.mc.set("%s_last_seen" % HubID.encode('utf8'), str(datetime.now()))
     hub.hubid = HubID
+    locks[HubID.encode('utf8')] = RLock()
+    print "HUBID", HubID.encode('utf8')
 
     for domain in secret.MySQL.keys():
         session = Session[domain]()
