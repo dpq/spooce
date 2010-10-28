@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 import logging, hmac, hashlib, uuid, random, new
-import memcache, cookielib, sys, getopt,re
+import cookielib, sys, getopt,re
 from ConfigParser import ConfigParser
 
 import urllib2
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from gevent import monkey; monkey.patch_socket()
 from gevent.wsgi import WSGIServer
 from gevent.coros import RLock
+from geventmemcache.client import Memcache
 
 from werkzeug import Request, Response
 from werkzeug.contrib.securecookie import SecureCookie
@@ -115,9 +116,11 @@ class Hub(object):
                         session.close()
                         break
             print 'Continuing terminal initialization: %s' % tid.encode('utf8')
+            locks[tid.encode('utf8')] = RLock()
+            locks[tid.encode('utf8')].acquire()
             self.mc.set("%s_inbox" % tid.encode('utf8'), "[]")
             self.mc.set("%s_last_seen" % tid.encode('utf8'), str(datetime.now()))
-            locks[tid.encode('utf8')] = RLock()
+            locks[tid.encode('utf8')].release()
             mac = hmac.new(secret.SessionSecret[domain], None, hashlib.sha1)
             mac.update(tid)
             self.__push(domain, {"event": "connect", "tid": "/%s" % tid, "src": "/%s" % self.hubid})
@@ -139,11 +142,12 @@ class Hub(object):
             tid = self.__tid(req)
             if not tid:
                 return [tojson({'status': 2, 'errmsg': 'Authentication error.'})]
-            locks[tid.encode('utf8')].acquire()
-            self.mc.delete("%s_inbox" % tid.encode('utf8'))
-            self.mc.delete("%s_last_seen" % tid.encode('utf8'))
-            locks[tid.encode('utf8')].release()
-            del locks[tid.encode('utf8')]
+            if locks.has_key(tid.encode('utf8')):
+                locks[tid.encode('utf8')].acquire()
+                self.mc.delete("%s_inbox" % tid.encode('utf8'))
+                self.mc.delete("%s_last_seen" % tid.encode('utf8'))
+                locks[tid.encode('utf8')].release()
+                del locks[tid.encode('utf8')]
             if session.query(Terminal[domain]).filter_by(tid=tid).one().key == "" or (req.args.has_key("release") and req.args["release"] == 1):
                 session.delete(session.query(Terminal[domain]).filter_by(tid=tid).one())
             session.commit()
@@ -227,11 +231,15 @@ class Hub(object):
 
     def __push(self, domain, message, tid=None):
         if tid:
+            if not locks.has_key(tid.encode('utf8')):
+                logging.warning('Terminal %s not registered in the system. Vacuum the DB.' % tid)
+                return
             locks[tid.encode('utf8')].acquire()
             try:
                 messages = self.mc.get("%s_inbox" % tid.encode('utf8'))
             except:
                 logging.error("__push memcached failure", exc_info=1)
+            locks[tid.encode('utf8')].release()
             if messages:
                 messages = fromjson(messages)
                 messages.append(message)
@@ -240,7 +248,6 @@ class Hub(object):
             else:
                 logging.error("Malformed inbox, not pushing (%s_inbox)" % tid.encode('utf8'))
                 logging.info("Inbox is %s " % str(messages))
-            locks[tid.encode('utf8')].release()
         else:
             session = Session[domain]()
             dstlist, filterlist = [], []
@@ -273,13 +280,15 @@ class Hub(object):
             messages = self.mc.get("%s_inbox" % tid.encode('utf8'))
         except:
             logging.error("__pull failure", exc_info=1)
+        locks[tid.encode('utf8')].release()
         if messages:
+            locks[tid.encode('utf8')].acquire()
             self.mc.set("%s_inbox" % tid.encode('utf8'), "[]")
+            locks[tid.encode('utf8')].release()
             res = fromjson(messages)
         else:
             res = []
             logging.error("Malformed inbox, not pulling (%s_inbox)" % tid.encode('utf8'))
-        locks[tid.encode('utf8')].release()
         return res
 
 
@@ -447,9 +456,10 @@ def main():
             print "Malformed configuration file: mission option %s in section MemCache" % param
             sys.exit(1)
         params[param] = Config.get("MemCache", param)
-    
+
     try:
-        MemCache = memcache.Client(["%s:%s" % (params["host"], params["port"])], debug=0)
+        #MemCache = memcache.Client(["%s:%s" % (params["host"], params["port"])], debug=0)
+        mc = Memcache([(("127.0.0.1", 11211), 100)])
     except:
         print "Failed to establish connection to the memcache daemon"
         print "Check the log file for details"
@@ -480,11 +490,13 @@ def main():
         sys.exit(1)
 
 
-    hub.mc = MemCache
+    hub.mc = mc
+    locks[HubID.encode('utf8')] = RLock()
+    locks[HubID.encode('utf8')].acquire()
     hub.mc.set("%s_inbox" % HubID.encode('utf8'), "[]")
     hub.mc.set("%s_last_seen" % HubID.encode('utf8'), str(datetime.now()))
+    locks[HubID.encode('utf8')].release()
     hub.hubid = HubID
-    locks[HubID.encode('utf8')] = RLock()
     print "HUBID", HubID.encode('utf8')
 
     for domain in secret.MySQL.keys():
