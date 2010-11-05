@@ -72,8 +72,9 @@ class Opt:
                     module.__dict__["opt"] = opt
                     exec src in module.__dict__
                     sys.modules[meta[0]] = module
-                except:
+                except Exception as error:
                     log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
+                    log.error(str(error))
                     result = False
             else:
                 result = False
