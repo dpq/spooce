@@ -171,9 +171,13 @@ kernel.mx = function() {
                     parseInt(message.msgid, 10) !== Number.NaN &&
                     typeof kernel.process[message.dst].__callback[message.msgid] == "function") {
                         msgid = message.msgid;
-                        delete message.msgid;
+                        if (! message.multipart) {
+                            delete message.msgid;
+                        }
                         kernel.process[message.dst].__callback[msgid].call(kernel.process[message.dst], message);
-                        delete kernel.process[message.dst].__callback[msgid];
+                        if (! message.multipart) {
+                            delete kernel.process[message.dst].__callback[msgid];
+                        }
                 }
                 /* Can the destination app process an incoming message? */
                 else {
