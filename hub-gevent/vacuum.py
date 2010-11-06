@@ -76,8 +76,8 @@ def main():
         print "Time to live not specified in the config file, aborting."
         sys.exit(1)
     
-    if Config.has_option('Global', 'log'):
-        log = Config.get('Global', 'log')
+    if Config.has_option('Global', 'vacuumlog'):
+        log = Config.get('Global', 'vacuumlog')
 
     logging.basicConfig(filename=log,
         level=logging.DEBUG,

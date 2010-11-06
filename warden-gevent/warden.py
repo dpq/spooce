@@ -4,7 +4,7 @@ from gevent import monkey; monkey.patch_socket()
 from gevent.wsgi import WSGIServer
 
 from werkzeug import Request, Response
-import logging, os, memcache, getopt, sys, new, hmac, hashlib
+import logging, os, getopt, sys, new, hmac, hashlib
 from urllib import quote_plus as quote, urlencode
 from uuid import uuid4
 from ConfigParser import ConfigParser
@@ -16,23 +16,28 @@ from sqlalchemy.types import String, Boolean, DateTime, Text, Integer
 from sqlalchemy import Table, Column, MetaData, Index, desc, create_engine
 from urllib2 import urlopen
 import secret, default
-
+from geventmemcache.client import Memcache
+from werkzeug import Local, LocalManager
 
 import smtplib
 from email.mime.text import MIMEText
 
+local = Local()
+local_manager = LocalManager([local])
+Session = local('Session')
+User = local('User')
+MethodEmail = local('MethodEmail')
+local.Session = []
+local.User = []
+local.MethodEmail = []
 
-Session, User, MethodEmail = {}, {}, {}
-MemCache = {}
-
+configfile = ""
 
 def __User_init__(self):
     pass
 
 def __User_repr__(self):
     return "<User('%d')>"%(self.uid)
-
-
 
 def __MethodEmail_init__(self, uid, email, password):
     self.uid = uid
@@ -44,6 +49,26 @@ def __MethodEmail_init__(self, uid, email, password):
 
 def __MethodEmail_repr__(self):
     return "<MethodEmail(%d => %s)>" % (self.uid, self.email)
+
+def makeUser(base):
+    return new.classobj("user", (base, ), {
+        "__tablename__": 'user',
+        "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+        "__init__": __User_init__,
+        "__repr__": __User_repr__,
+        "uid": Column(Integer, primary_key=True)
+    })
+
+def makeMethodEmail(base):
+    return new.classobj("method_email", (base, ), {
+        "__tablename__": 'method_email',
+        "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+        "__init__": __MethodEmail_init__,
+        "__repr__": __MethodEmail_repr__,
+        "email": Column(String(255), primary_key=True, autoincrement=False),
+        "password": Column(String(24)),
+        "uid": Column(Integer)
+    })
 
 
 # Ported from Recipe 3.9 in Secure Programming Cookbook for C and C++ by
@@ -99,7 +124,7 @@ def isValidAddress(addr):
 
 class Warden(object):
     def __init__(self):
-        pass
+        self.mc = {}
 
 
     def __register(self, req):
@@ -154,19 +179,19 @@ class Warden(object):
         if res[0] == "false":
             return [res[1]]
         
-        session = Session()
-        query = session.query(MethodEmail).filter_by(email=email)
+        session = Session[0]()
+        query = session.query(MethodEmail[0]).filter_by(email=email)
         uid = self.__uid(req)
         token = str(uuid4())
         if uid == None and query.count() == 0:
             # New user
-            MemCache.set("tmptoken_" + token, "%s" % (email), 3600)
+            self.mc.set("tmptoken_" + token, "%s" % (email), 3600)
         elif query.count() == 1 and query.one().uid == uid and uid != None:
             # Setting a new password
-            MemCache.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
+            self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
         elif query.count() == 0 and uid != None:
             # Adding a new email
-            MemCache.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
+            self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
         else:
             return ["Permission denied"]
 
@@ -191,7 +216,7 @@ class Warden(object):
             return ["Access denied"]
         token = req.values["token"]
         try:
-            token = MemCache.get("tmptoken_" + str(token))
+            token = self.mc.get("tmptoken_" + str(token))
         except:
             logging.error("__addEmailAuth2 failure", exc_info=1)
             return ["Internal server error"]
@@ -203,12 +228,29 @@ class Warden(object):
         <html>
         <head>
             <title>Please enter the password</title>
+            <script type="text/javascript">
+            function init() {
+                document.getElementById("mode").onclick = function() {
+                    var passwd = document.getElementById("password");
+                    if (passwd.getAttribute("type") == "password") {
+                        passwd.setAttribute("type", "text");
+                    }
+                    else {
+                        passwd.setAttribute("type", "password");
+                    }
+                };
+            }
+            </script>
         </head>
-        <body>
+        <body onload="init()">
             <form action="/regemail3" method="post">
-                <span>Please enter the password:</span><br/>
+                <span>Please enter the password:</span>
                 <input type="hidden" name="token" value="__TOKEN__" />
-                <input type="password" size="20" name="password" style="border: 1px solid black" />
+                <br/>
+                <input id="password" type="password" size="20" name="password" style="border: 1px solid black" />
+                <br/>
+                <input id="mode" type="checkbox" /><label for="mode">Show password</label>
+                <br/>
                 <input type="submit" />
             </form>
         </body>
@@ -224,7 +266,7 @@ class Warden(object):
         mac.update(req.values["password"])
         password = mac.digest().encode('base64').strip()
         try:
-            token = MemCache.get("tmptoken_" + str(req.values["token"]))
+            token = self.mc.get("tmptoken_" + str(req.values["token"]))
         except:
             logging.error("__addEmailAuth3 failure", exc_info=1)
             return ["Internal server error"]
@@ -233,13 +275,13 @@ class Warden(object):
             return ["Token does not exist or has expired"]
 
         token = token.split()
-        MemCache.delete("tmptoken_" + str(req.values["token"]))
+        self.mc.delete("tmptoken_" + str(req.values["token"]))
         if len(token) == 0:
             return ["Token empty"]
         elif len(token) == 1:
             email = token[0]
-            session = Session()
-            u = User()
+            session = Session[0]()
+            u = User[0]()
             session.add(u)
             session.flush()
             uid = u.uid
@@ -253,15 +295,15 @@ class Warden(object):
                 logging.error("__addEmailAuth3 failure", exc_info=1)
                 return ["Invalid UID"]
         
-        session = Session()
+        session = Session[0]()
         try:
-            if session.query(MethodEmail).filter_by(email=email).count() == 0:
-                session.add(MethodEmail(uid, email, password))
+            if session.query(MethodEmail[0]).filter_by(email=email).count() == 0:
+                session.add(MethodEmail[0](uid, email, password))
                 session.commit()
                 session.close()
                 return ["Email authentication added"]
             else:
-                session.query(MethodEmail).filter_by(email=email, uid=uid).one().password = password
+                session.query(MethodEmail[0]).filter_by(email=email, uid=uid).one().password = password
                 session.commit()
                 session.close()
                 return ["Email password changed"]
@@ -286,29 +328,29 @@ class Warden(object):
         except:
             logging.error("__removeEmailAuth failure", exc_info=1)
             return ["Invalid UID"]
-        session = Session()
-        query = session.query(MethodEmail).filter_by(email=email,uid=uid)
+        session = Session[0]()
+        query = session.query(MethodEmail[0]).filter_by(email=email,uid=uid)
         token = str(uuid4())
         if uid == None and query.count() == 0:
             # New user
-            MemCache.set("tmptoken_" + token, "%s" % (email), 3600)
+            self.mc.set("tmptoken_" + token, "%s" % (email), 3600)
         elif query.count() == 1 and query.one().uid == uid and uid != None:
             # Setting a new password
-            MemCache.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
+            self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
         elif query.count() == 0 and uid != None:
             # Adding a new email
-            MemCache.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
+            self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
         else:
             return ["Permission denied"]
 
 
     def __authenticateByEmail(self, req):
         email, password = req.values["email"], req.values["password"]
-        session = Session()
+        session = Session[0]()
         mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
         mac.update(password)
         password = mac.digest().encode('base64').strip()
-        query = session.query(MethodEmail).filter_by(email=email, password=password)
+        query = session.query(MethodEmail[0]).filter_by(email=email, password=password)
         if query.count() != 1:
             return ""
         else:
@@ -340,6 +382,23 @@ class Warden(object):
 
     def __call__(self, env, start_response):
         req = Request(env)
+        Config = ConfigParser()
+        Config.read(configfile)
+        params = {"host": "", "user": "", "database": "", "port": ""}
+        for param in params:
+            if not Config.has_option("MySQL", param):
+                print "Malformed configuration file: mission option %s in section MySQL" % (param)
+                sys.exit(1)
+            params[param] = Config.get("MySQL", param)    
+        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+            (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
+        Base = declarative_base(bind=engine)
+        local.Session = []
+        local.User = []
+        local.MethodEmail = []
+        local.Session.append(sessionmaker(bind=engine))
+        local.User.append(makeUser(Base))
+        local.MethodEmail.append(makeMethodEmail(Base))
         resp = Response(status=200)
         if req.path == '/register':
             resp.content_type = "text/html"
@@ -375,7 +434,7 @@ class Warden(object):
 
 
 def main():
-    global Session, User, MethodEmail, MemCache
+    global configfile
     configfile, port, log = default.config, default.port, default.log
 
     try:
@@ -391,7 +450,7 @@ def main():
     Config = ConfigParser()
     Config.read(configfile)
 
-    for section in ["Global", "MySQL", "MemCache"]:
+    for section in ["Global", "MySQL"]:
         if not Config.has_section(section):
             print "Malformed configuration file"
             sys.exit()
@@ -426,50 +485,35 @@ def main():
         engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
             (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base = declarative_base(bind=engine)
-        Session = sessionmaker(bind=engine)
-
-        User = new.classobj("user", (Base, ), {
-            "__tablename__": 'user',
-            "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-            "__init__": __User_init__,
-            "__repr__": __User_repr__,
-            "uid": Column(Integer, primary_key=True)
-            })
-
-        MethodEmail = new.classobj("method_email", (Base, ), {
-            "__tablename__": 'method_email',
-            "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-            "__init__": __MethodEmail_init__,
-            "__repr__": __MethodEmail_repr__,
-            "email": Column(String(255), primary_key=True, autoincrement=False),
-            "password": Column(String(24)),
-            "uid": Column(Integer)
-        })
-
+        Session.append(sessionmaker(bind=engine))
+        User.append(makeUser(Base))
+        MethodEmail.append(makeMethodEmail(Base))
         Base.metadata.create_all(engine)
     except:
         print "Failed to establish connection to the database"
         print "Check the log file for details"
         logging.error("DB connection failure", exc_info=1)
         sys.exit(1)
-
-
+    
     params = {"host": "", "port": ""}
     for param in params:
         if not Config.has_option("MemCache", param):
-            print "Malformed configuration file: mission option %s in section MemCache" % param
+            print "Malformed configuration file: mission option %s in section self.mc" % param
             sys.exit(1)
         params[param] = Config.get("MemCache", param)
     
     try:
-        MemCache = memcache.Client(["%s:%s" % (params["host"], params["port"])], debug=0)
+        #self.mc = memcache.Client(["%s:%s" % (params["host"], params["port"])], debug=0)
+        mc = Memcache([((params["host"], int(params["port"])), 100)])
     except:
         print "Failed to establish connection to the memcache daemon"
         print "Check the log file for details"
-        logging.error("MemCache daemon connection failure", exc_info=1)
+        logging.error("self.mc daemon connection failure", exc_info=1)
         sys.exit(1)
 
-    server = WSGIServer(("0.0.0.0", int(port)), Warden())
+    warden = Warden()
+    warden.mc = mc
+    server = WSGIServer(("0.0.0.0", int(port)), warden)
     try:
         logging.info("Server running on port %s. Ctrl+C to quit" % port)
         server.serve_forever()

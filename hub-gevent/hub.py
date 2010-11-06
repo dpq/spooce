@@ -64,6 +64,32 @@ def __Subscription_repr__(self):
     return "<Subscription('%s'=>'%s' -- %s)>" % (self.publisher, self.subscriber, self.filter)
 
 
+def makeTerminal(base, domain):
+    return new.classobj("terminal_%s" % domain, (base, ), {
+        "__tablename__": 'terminal',
+        "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+        "__init__": __Terminal_init__,
+        "__repr__": __Terminal_repr__,
+        "tid": Column(String(32), primary_key=True, autoincrement=False),
+        "last_seen": Column(DateTime),
+        "key": Column(String(24))
+    })
+
+def makeSubscription(base, domain):
+    return new.classobj("subscription_%s" % domain, (base, ), {
+        "__tablename__": 'subscription',
+        "__table_args__":  {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+        "__init__": __Subscription_init__,
+        "__repr__": __Subscription_repr__,
+        "id": Column(Integer, primary_key=True),
+        "subscriber": Column(String(128)),
+        "publisher": Column(String(128)),
+        "filter": Column(String(1024))
+    })
+
+
+
+
 class Hub(object):
     def __init__(self):
         self.mc = {}
@@ -364,27 +390,8 @@ class Hub(object):
             (params["user"], secret.MySQL[domain], params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base[domain] = declarative_base(bind=engine)
         Session[domain] = sessionmaker(bind=engine)
-    
-        Terminal[domain] = new.classobj("terminal_%s" % domain, (Base[domain], ), {
-            "__tablename__": 'terminal',
-            "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-            "__init__": __Terminal_init__,
-            "__repr__": __Terminal_repr__,
-            "tid": Column(String(32), primary_key=True, autoincrement=False),
-            "last_seen": Column(DateTime),
-            "key": Column(String(24))
-        })
-    
-        Subscription[domain] = new.classobj("subscription_%s" % domain, (Base[domain], ), {
-            "__tablename__": 'subscription',
-            "__table_args__":  {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-            "__init__": __Subscription_init__,
-            "__repr__": __Subscription_repr__,
-            "id": Column(Integer, primary_key=True),
-            "subscriber": Column(String(128)),
-            "publisher": Column(String(128)),
-            "filter": Column(String(1024))
-        })
+        Terminal[domain] = makeTerminal(Base[domain], domain)
+        Subscription[domain] = makeSubscription(Base[domain], domain)
         resp = Response(status=200, content_type="text/plain")
         if req.path == '/connect':
             resp.response = self.__connect(req)
@@ -427,10 +434,10 @@ def main():
             print "Malformed configuration file: missing section %s" % section
             sys.exit(1)
 
-    if Config.has_option('Global', 'port'):
-        port = Config.get('Global', 'port')
-    if Config.has_option('Global', 'log'):
-        log = Config.get('Global', 'log')
+    if Config.has_option('Global', 'mxport'):
+        port = Config.get('Global', 'mxport')
+    if Config.has_option('Global', 'mxlog'):
+        log = Config.get('Global', 'mxlog')
 
     if not Config.has_option('Global', 'repos') or Config.get('Global', 'repos') == "":
         print "No repositories specified; the system is not functional"
@@ -471,31 +478,9 @@ def main():
                 (params["user"], secret.MySQL[domain], params["host"], params["port"], params["database"]), pool_recycle=3600)
             Base[domain] = declarative_base(bind=engine)
             Session[domain] = sessionmaker(bind=engine)
-        
-            Terminal[domain] = new.classobj("terminal_%s" % domain, (Base[domain], ), {
-                "__tablename__": 'terminal',
-                "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-                "__init__": __Terminal_init__,
-                "__repr__": __Terminal_repr__,
-                "tid": Column(String(32), primary_key=True, autoincrement=False),
-                "last_seen": Column(DateTime),
-                "key": Column(String(24))
-            })
-        
-            Subscription[domain] = new.classobj("subscription_%s" % domain, (Base[domain], ), {
-                "__tablename__": 'subscription',
-                "__table_args__":  {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-                "__init__": __Subscription_init__,
-                "__repr__": __Subscription_repr__,
-                "id": Column(Integer, primary_key=True),
-                "subscriber": Column(String(128)),
-                "publisher": Column(String(128)),
-                "filter": Column(String(1024))
-            })
-
-
+            Terminal[domain] = makeTerminal(Base[domain], domain)
+            Subscription[domain] = makeSubscription(Base[domain], domain)
             Index("index_subscription_%s" % domain, Subscription[domain].publisher)
-
             Base[domain].metadata.create_all(engine)
         except:
             print "Failed to establish connection to the database for domain %s " % domain
@@ -512,7 +497,7 @@ def main():
 
     try:
         #MemCache = memcache.Client(["%s:%s" % (params["host"], params["port"])], debug=0)
-        mc = Memcache([(("127.0.0.1", 11211), 100)])
+        mc = Memcache([((params["host"], int(params["port"])), 100)])
     except:
         print "Failed to establish connection to the memcache daemon"
         print "Check the log file for details"
