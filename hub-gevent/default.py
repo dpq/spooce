@@ -7,4 +7,4 @@ fxport = 8084
 mxlog = "hub.log"
 fxlog = "blob.log"
 vacuumlog = "vacuum.log"
-ttl = 3600
+ttl = 60

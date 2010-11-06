@@ -13,6 +13,7 @@ from gevent import monkey; monkey.patch_socket()
 from gevent.wsgi import WSGIServer
 from gevent.coros import RLock
 from geventmemcache.client import Memcache
+from werkzeug import Local, LocalManager
 
 from werkzeug import Request, Response
 from werkzeug.contrib.securecookie import SecureCookie
@@ -24,8 +25,16 @@ from sqlalchemy.types import String, Boolean, DateTime, Text, Integer
 from sqlalchemy import Table, Column, MetaData, Index, desc, create_engine
 
 import secret, default
+configfile = ""
+local = Local()
+local_manager = LocalManager([local])
 
-Session, Terminal, Subscription = {}, {}, {}
+Session = local('Session')
+Terminal = local('Terminal')
+Subscription = local('Subscription')
+local.Session = {}
+local.Terminal = {}
+local.Subscription = {}
 
 locks = {}
 
@@ -97,6 +106,9 @@ class Hub(object):
                     session.close()
                     return [tojson({'status': 3, 'errmsg': 'Invalid TID supplied.'})]
                 tid, key = req.args['tid'], req.args['key']
+                if self.mc.get("%s_inbox" % tid.encode('utf8')) or self.mc.get("%s_last_seen" % tid.encode('utf8')):
+                    session.close()
+                    return [tojson({'status': 4, 'errmsg': 'Already connected.'})]
                 mac = hmac.new(secret.NameSecret[domain], None, hashlib.md5)
                 mac.update(key)
                 if session.query(Terminal[domain]).filter_by(tid=tid).count() == 0:
@@ -243,8 +255,11 @@ class Hub(object):
             if messages:
                 messages = fromjson(messages)
                 messages.append(message)
-                self.mc.set("%s_inbox" % tid.encode('utf8'), tojson(messages))
-                print "Pushed to", "%s_inbox" % tid.encode('utf8')
+                messages = tojson(messages)
+                if len(messages) < 1024*1024:
+                    self.mc.set("%s_inbox" % tid.encode('utf8'), messages)
+                else:
+                    logging.error("Inbox overflow for %s " % tid.encode('utf8'))
             else:
                 logging.error("Malformed inbox, not pushing (%s_inbox)" % tid.encode('utf8'))
                 logging.info("Inbox is %s " % str(messages))
@@ -332,6 +347,44 @@ class Hub(object):
 
     def __call__(self, env, start_response):
         req = Request(env)
+        domain = self.__domain(req)
+        Config = ConfigParser()
+        Config.read(configfile)
+        params = {"host": "", "user": "", "database": "", "port": ""}
+        Base = {}
+        local.Session = {}
+        local.Terminal = {}
+        local.Subscription = {}
+        for param in params:
+            if not Config.has_option(domain, param):
+                print "Malformed configuration file: mission option %s in section %s" % (param, domain)
+                sys.exit(1)
+            params[param] = Config.get(domain, param)
+        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+            (params["user"], secret.MySQL[domain], params["host"], params["port"], params["database"]), pool_recycle=3600)
+        Base[domain] = declarative_base(bind=engine)
+        Session[domain] = sessionmaker(bind=engine)
+    
+        Terminal[domain] = new.classobj("terminal_%s" % domain, (Base[domain], ), {
+            "__tablename__": 'terminal',
+            "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+            "__init__": __Terminal_init__,
+            "__repr__": __Terminal_repr__,
+            "tid": Column(String(32), primary_key=True, autoincrement=False),
+            "last_seen": Column(DateTime),
+            "key": Column(String(24))
+        })
+    
+        Subscription[domain] = new.classobj("subscription_%s" % domain, (Base[domain], ), {
+            "__tablename__": 'subscription',
+            "__table_args__":  {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+            "__init__": __Subscription_init__,
+            "__repr__": __Subscription_repr__,
+            "id": Column(Integer, primary_key=True),
+            "subscriber": Column(String(128)),
+            "publisher": Column(String(128)),
+            "filter": Column(String(1024))
+        })
         resp = Response(status=200, content_type="text/plain")
         if req.path == '/connect':
             resp.response = self.__connect(req)
@@ -352,7 +405,7 @@ class Hub(object):
 
 
 def main():
-    global Session, Terminal, Subscription
+    global configfile
     configfile, port, log = default.config, default.mxport, default.mxlog
     Base = {}
 
@@ -505,6 +558,7 @@ def main():
         session.commit()
         session.close()
 
+    hub = local_manager.make_middleware(hub)
     server = WSGIServer(("0.0.0.0", int(port)), hub)
     try:
         logging.info("Server running on port %s. Ctrl+C to quit" % port)

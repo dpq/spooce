@@ -15,6 +15,10 @@ from sqlalchemy import Table, Column, MetaData, Index, desc, create_engine
 
 import secret, default
 
+# Add the following to the crontab
+# m h  dom mon dow   command
+# * * * * *  cd YOUR_WORKING_DIRECTORY; ./vacuum.py
+
 def __Terminal_init__(self, tid, key = ""):
     self.tid = tid
     if key != "":
