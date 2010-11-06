@@ -26,7 +26,7 @@ Config.read("/etc/spooce/apps/subsolar.cfg")
 
 user, host, port, database = Config.get("MySQL", "user"), Config.get("MySQL", "host"), Config.get("MySQL", "port"), Config.get("MySQL", "database")
 
-secret_MySQL = "subsolarpass"
+secret_MySQL =  Config.get("MySQL", "passwd")
 
 
 def __InstrumentMAG_init__(self, dt, b_x, b_y, b_z, b_t, gsm_lat, gsm_lon):
