@@ -1,0 +1,182 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+from gevent import monkey; monkey.patch_socket()
+from gevent.wsgi import WSGIServer
+from ConfigParser import ConfigParser
+
+from werkzeug import Request, Response
+import logging, os, new, re, getopt, sys
+
+from sqlalchemy.dialects import mysql
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.types import String, Boolean, DateTime, Text, Integer
+from sqlalchemy import Table, Column, MetaData, ForeignKey, Index, desc, create_engine
+from simplejson import dumps as tojson, loads as fromjson
+
+import magic, default, secret
+
+Session, FileEntry = {}, {}
+
+def __FileEntry_init__(self, id, filename, filetype):
+    self.id = id
+    self.filename = filename
+    self.filename = filetype
+
+
+def __FileEntry_repr__(self):
+    print "File %s %s %s" % (self.id, self.filename, self.filetype)
+
+
+class Blob(object):
+    def __init__(self):
+        pass
+
+    def __upload(self, req):
+        try:
+            session = Session()
+            if session.query(FileEntry).filter_by(id=req.values["fileid"]).count() == 1:
+                if len(req.files) != 1 or "file" not in req.files:
+                    return ["Accepts exactly one file"]
+                file = req.files["file"]
+                file.save(os.path.join(path, req.values["fileid"]))
+                mime = magic.Magic(mime=True)
+                filetype = mime.from_file(os.path.join(path, req.values["fileid"]))
+                filename = file.filename
+                session.add(FileEntry(req.values["fileid"], filename, filetype))
+                session.commit()
+                session.close()
+                return ["File uploaded"]
+            else:
+                session.close()
+                return ["Unauthorized request"]
+        except:
+            logging.error("__upload failure", exc_info=1)
+            session.close()
+            return ["An unknown error has occured"]
+    
+    def __download(self, req):
+        session = Session()
+        try:
+            fileid = req.values["fileid"]
+            force = False
+            if "force" in req.values:
+                force = True
+            lang, appcode, versioncode = req.path.split("/")[2:5]
+            if session.query(FileEntry).filter_by(id=fileid).count() == 1:
+                res = session.query(Package).filter_by(lang=lang, appcode=appcode, versioncode=versioncode).one()
+                filename, filetype = res.filename, res.filetype
+                session.close()
+                body = open(os.path.join(path, fileid), "rb").read()
+                if force:
+                    filetype = "application/octet-stream"
+                return 200, filename, filetype, [body]
+        except:
+            logging.error("__download failure", exc_info=1)
+        session.close()
+        return 404, "", "text/plain", [""]
+
+    def __call__(self, env, start_response):
+        req = Request(env)
+        resp = Response(status=200, content_type="text/plain")
+        if req.path.startswith('/fx'):
+            if req.method == "GET":
+                resp.status_code, filename, resp.content_type, resp.response = self.__download(req)
+                if resp.content_type == "application/octet-stream":
+                    resp.headers["Content-Disposition"] = "attachment; filename=%s" % filename
+                return resp(env, start_response)
+            elif req.method == "POST":
+                resp.content_type="text/plain"
+                resp.response = self.__upload(req)
+                return resp(env, start_response)
+        else:
+            resp.status_code = 404
+            resp.content_type="text/plain"
+            resp.response = ""
+            return resp(env, start_response)
+
+
+def main():
+    configfile, port, log = default.config, default.fxport, default.fxlog
+    global Session, FileEntry
+    Base = {}
+
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "c:", ["config="])
+    except getopt.GetoptError, err:
+        print str(err)
+        sys.exit(1)
+
+    for option, value in opts:
+        if option in ("-c", "--config"):
+            configfile = value
+
+    Config = ConfigParser()
+    Config.read(configfile)
+
+    for section in ["FileSystem"]:
+        if not Config.has_section(section):
+            print "Malformed configuration file"
+            sys.exit()
+
+    logging.basicConfig(filename=log,
+        level=logging.DEBUG,
+        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+        datefmt='%m-%d %H:%M:%S')
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    # set a format which is simpler for console use
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger('').addHandler(console)
+
+
+    for domain in secret.MySQL.keys():
+        if not Config.has_section(domain):
+            print "Malformed configuration file: missing section %s" % domain
+            sys.exit(1)
+        
+        params = {"host": "", "user": "", "database": "", "port": ""}
+        for param in params:
+            if not Config.has_option(domain, param):
+                print "Malformed configuration file: mission option %s in section %s" % (param, domain)
+                sys.exit(1)
+            params[param] = Config.get(domain, param)
+ 
+        try:
+            engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+                (params["user"], secret.MySQL[domain], params["host"], params["port"], params["database"]), pool_recycle=3600)
+            Base[domain] = declarative_base(bind=engine)
+            Session[domain] = sessionmaker(bind=engine)
+
+            FileEntry[domain] = new.classobj("fileentry", (Base[domain], ), {
+                "__tablename__": 'fileentry',
+                "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+                "__init__": __FileEntry_init__,
+                "__repr__": __FileEntry_repr__,
+                "id": Column(String(32), primary_key=True),
+                "filename": Column(String(128)),
+                "filetype": Column(String(32)),
+            })
+
+            Base[domain].metadata.create_all(engine)
+        except:
+            print "Failed to establish connection to the database"
+            print "Check the log file for details"
+            logging.error("DB connection failure", exc_info=1)
+            sys.exit(1)
+
+    server = WSGIServer(("0.0.0.0", int(port)), Blob())
+    try:
+        logging.info("Server running on port %s. Ctrl+C to quit" % port)
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.stop()
+        logging.info("Server stopped")
+
+
+if __name__ == "__main__":
+    main()

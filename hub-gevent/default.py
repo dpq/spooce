@@ -1,6 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-config = "hub.cfg"
-port = 8080
-log = "log"
+config = "/etc/spooce/hub.cfg"
+mxport = 8080
+fxport = 8084
+mxlog = "hub.log"
+fxlog = "blob.log"
+vacuumlog = "vacuum.log"
+ttl = 3600

@@ -129,7 +129,7 @@ class Hub(object):
                 'hubid': '/%s' % self.hubid,
                 'repo': self.repos[random.randrange(len(self.repos))],
                 'warden': self.wardens[random.randrange(len(self.wardens))],
-                'calibration': {'interval': 2000}})]
+                'calibration': {'interval': 200}})]
         except:
             logging.error("__connect failure", exc_info=1)
             return [tojson({'status': 1, 'errmsg': 'An error has occured. Please contact tech support.'})]
@@ -353,7 +353,7 @@ class Hub(object):
 
 def main():
     global Session, Terminal, Subscription
-    configfile, port, log = default.config, default.port, default.log
+    configfile, port, log = default.config, default.mxport, default.mxlog
     Base = {}
 
     try:
