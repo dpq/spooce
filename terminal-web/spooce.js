@@ -15,7 +15,7 @@ kernel.renderFactory = function(target) {
        target.replaceWith(element);
        kernel.element[appid] = element;
    }
-}
+};
 
 kernel.run = function(meta, args, callback) {
     if (! kernel.runQueue[meta.appcode]) {
@@ -54,7 +54,7 @@ kernel.run = function(meta, args, callback) {
             callback(appid);
         }
     }
-}
+};
 
 
 kernel.kill = function(id) {
@@ -68,7 +68,7 @@ kernel.kill = function(id) {
     }
     delete kernel.process[id];
     kernel.sendMessage({"src": kernel.tid, "event": "kill", "appid": appid});
-}
+};
 
 
 kernel.connect = function(callback, tid, key) {
@@ -83,6 +83,7 @@ kernel.connect = function(callback, tid, key) {
         kernel.tidhash = result.tid;
         kernel.tid = "/" + result.tid.split("+")[1];
         kernel.uidhash = "";
+        kernel.uid = "";
         kernel.hubid = result.hubid;
         kernel.process[kernel.tid] = {};
         kernel.repo = result.repo;
@@ -93,7 +94,7 @@ kernel.connect = function(callback, tid, key) {
             callback();
         }
     });
-}
+};
 
 
 kernel.disconnect = function() {
@@ -101,7 +102,7 @@ kernel.disconnect = function() {
         kernel.hubid = "";
         delete kernel.process[kernel.tid];
     });
-}
+};
 
 
 kernel.login = function(email, password) {
@@ -113,15 +114,17 @@ kernel.login = function(email, password) {
         success: function(result) {
             kernel.uidhash = result;
             kernel.uid = result.split("+")[1];
+            alert(kernel.uidhash);
+            alert(kernel.uid);
         }
     });
-}
+};
 
 
 kernel.logout = function() {
     kernel.uidhash = "";
     kernel.uid = "";
-}
+};
 
 
 /* Initiate communication session with the hub; upload the message queue and download any messages already waiting in the inbox */
@@ -171,11 +174,11 @@ kernel.mx = function() {
                     parseInt(message.msgid, 10) !== Number.NaN &&
                     typeof kernel.process[message.dst].__callback[message.msgid] == "function") {
                         msgid = message.msgid;
-                        if (! message.multipart) {
+                        if (! message.partial) {
                             delete message.msgid;
                         }
                         kernel.process[message.dst].__callback[msgid].call(kernel.process[message.dst], message);
-                        if (! message.multipart) {
+                        if (! message.partial) {
                             delete kernel.process[message.dst].__callback[msgid];
                         }
                 }
@@ -188,7 +191,7 @@ kernel.mx = function() {
             }
         }
     });
-}
+};
 
 
 /* This method is used by apps to communicate with each other. */
@@ -221,7 +224,7 @@ kernel.sendMessage = function(message, callback) {
         kernel.messageQueue.push(message);
         return true;
     }
-}
+};
 
 
 kernel.subscribe = function(subscriber, publisher, filter, callback) {
@@ -235,7 +238,7 @@ kernel.subscribe = function(subscriber, publisher, filter, callback) {
     }
     msg.action = "subscribe";
     kernel.sendMessage(msg, callback);
-}
+};
 
 
 kernel.unsubscribe = function(subscriber, publisher) {
@@ -246,12 +249,11 @@ kernel.unsubscribe = function(subscriber, publisher) {
     msg.pub = publisher;
     msg.action = "unsubscribe";
     kernel.sendMessage(msg, callback);
-}
+};
 
 /* OPT is the OPT Packaging Tool */
 var opt = {};
 opt.package = {};
-
 
 opt.install = function(meta, callback) {
     if (opt.package[meta.appcode] && opt.package[meta.appcode][meta.versioncode]) {
@@ -261,8 +263,46 @@ opt.install = function(meta, callback) {
     if (meta.appcode && meta.versioncode) {
         $.getScript(kernel.repo + kernel.lang + "/" + meta.appcode + "/" + meta.versioncode, callback);
     }
-}
+};
 
+var util = {};
+
+util.authCookie = function() {
+    
+};
+
+util.renderAuthEmail = function(node) {
+    var email = document.createElement("input");
+    $(email).attr("type", "text").attr("size", "24");
+    var password = document.createElement("input");
+    $(password).attr("type", "password").attr("size", "24");
+    var button = document.createElement("input");
+    $(button).attr("type", "submit").attr("value", "Log In");
+    var text1 = document.createElement("span");
+    text1.appendChild(document.createTextNode("Please enter the email address:"));
+    var text2 = document.createElement("span");
+    text2.appendChild(document.createTextNode("Please enter the password:"));
+    node.appendChild(text1);
+    node.appendChild(document.createElement("br"));
+    node.appendChild(email);
+    node.appendChild(document.createElement("br"));
+    node.appendChild(text2);
+    node.appendChild(document.createElement("br"));
+    node.appendChild(password);
+    node.appendChild(document.createElement("br"));
+    node.appendChild(button);
+    $(button).bind("click", function() {
+        kernel.login($(email).val(), $(password).val());
+    });
+};
+
+util.renderLogOut = function(node) {
+    var button = document.createElement("input");
+    $(button).attr("type", "submit").attr("value", "Log Out").bind("click", function() {
+        kernel.logout();
+    });
+    node.appendChild(button);
+};
 
 $(document).bind("ready", function() {
     kernel.connect(function() {

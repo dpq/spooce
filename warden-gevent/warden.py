@@ -42,10 +42,7 @@ def __User_repr__(self):
 def __MethodEmail_init__(self, uid, email, password):
     self.uid = uid
     self.email = email
-    mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
-    mac.update(password)
-    self.password = mac.digest().encode('base64').strip()
-
+    self.password = password
 
 def __MethodEmail_repr__(self):
     return "<MethodEmail(%d => %s)>" % (self.uid, self.email)
@@ -66,7 +63,7 @@ def makeMethodEmail(base):
         "__init__": __MethodEmail_init__,
         "__repr__": __MethodEmail_repr__,
         "email": Column(String(255), primary_key=True, autoincrement=False),
-        "password": Column(String(24)),
+        "password": Column(String(40)),
         "uid": Column(Integer)
     })
 
@@ -263,7 +260,7 @@ class Warden(object):
         if not req.values.has_key("token") or not req.values.has_key("password"):
             return ["Access denied"]
         mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
-        mac.update(req.values["password"])
+        mac.update(req.values["password"].encode('utf8'))
         password = mac.digest().encode('base64').strip()
         try:
             token = self.mc.get("tmptoken_" + str(req.values["token"]))
@@ -345,18 +342,21 @@ class Warden(object):
 
 
     def __authenticateByEmail(self, req):
-        email, password = req.values["email"], req.values["password"]
+        email, password = req.values["email"], req.values["password"].encode('utf8')
         session = Session[0]()
         mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
         mac.update(password)
         password = mac.digest().encode('base64').strip()
         query = session.query(MethodEmail[0]).filter_by(email=email, password=password)
         if query.count() != 1:
+            session.close()
             return ""
         else:
             user = query.one()
+            uid = str(user.uid)
+            session.close()
             mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
-            mac.update(user.uid)
+            mac.update(uid)
             return quote("%s %s" % (mac.digest().encode('base64').strip(), uid))
 
 
