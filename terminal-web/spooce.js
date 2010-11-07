@@ -131,6 +131,76 @@ kernel.logout = function() {
 };
 
 
+kernel.register = function() {
+    var width  = 500;
+    var height = 350;
+    var left   = (screen.width  - width) / 2;
+    var top    = (screen.height - height) / 2;
+    var params = "width=" + width + ", height=" + height;
+    params += ", top=" + top + ", left=" + left;
+    params += ", directories=no";
+    params += ", location=no";
+    params += ", menubar=no";
+    params += ", resizable=no";
+    params += ", scrollbars=no";
+    params += ", status=no";
+    params += ", toolbar=no";
+    var url = "/register?method=email";
+    if (kernel.uidhash != "") {
+        url += "&uid=" + kernel.uidhash;
+    }
+    var popup = window.open(url, "Infiniboard registration", params);
+    if (window.focus) {
+        popup.focus()
+    }
+    return false;
+}
+
+
+kernel.listregister = function(callback) {
+    if (kernel.uidhash == "") {
+        callback("[]");
+    }
+    else {
+        $.ajax({
+            url: "/regemaillist",
+            dataType: "json",
+            type: "GET",
+            data: { "uid": kernel.uidhash },
+            success: function(result) {
+                callback(result);
+            }
+        });
+    }
+}
+
+kernel.unregister = function(email, callback) {
+    if (kernel.uidhash == "" || !email || email == "") {
+        return;
+    }
+    var width  = 500;
+    var height = 350;
+    var left   = (screen.width  - width) / 2;
+    var top    = (screen.height - height) / 2;
+    var params = "width=" + width + ", height=" + height;
+    params += ", top=" + top + ", left=" + left;
+    params += ", directories=no";
+    params += ", location=no";
+    params += ", menubar=no";
+    params += ", resizable=no";
+    params += ", scrollbars=no";
+    params += ", status=no";
+    params += ", toolbar=no";
+    var url = "/regemailkill?" + "&uid=" + kernel.uidhash + "&email=" + email;
+    var popup = window.open(url, "Infiniboard unregistration", params);
+    if (window.focus) {
+        popup.focus()
+    }
+    callback();
+    return false;
+}
+
+
 /* Initiate communication session with the hub; upload the message queue and download any messages already waiting in the inbox */
 kernel.mx = function() {
     var queueid = 0;
@@ -281,13 +351,18 @@ util.renderAuthWindow = function(authwindow, callback) {
     var password = document.createElement("input");
     $(password).attr("type", "password").attr("size", "24");
     var buttonok = document.createElement("input");
-    $(buttonok).attr("type", "submit").attr("value", "Sign In");
+    $(buttonok).attr("type", "button").attr("value", "Sign In");
     var buttoncancel = document.createElement("input");
-    $(buttoncancel).attr("type", "submit").attr("value", "Cancel");
+    $(buttoncancel).attr("type", "button").attr("value", "Cancel");
+    var register = document.createElement("span");
+    $(register).css({ "color": "black", "text-decoration": "underline", "cursor": "pointer"}).text("Register").bind("click", function() {
+        kernel.register();
+        $(buttoncancel).click();
+    });
     var text1 = document.createElement("span");
-    text1.appendChild(document.createTextNode("Please enter the email address:"));
+    $(text1).text("Please enter the email address:");
     var text2 = document.createElement("span");
-    text2.appendChild(document.createTextNode("Please enter the password:"));
+    $(text2).text("Please enter the password:");
     authwindow.appendChild(text1);
     authwindow.appendChild(document.createElement("br"));
     authwindow.appendChild(email);
@@ -298,6 +373,8 @@ util.renderAuthWindow = function(authwindow, callback) {
     authwindow.appendChild(document.createElement("br"));
     authwindow.appendChild(buttonok);
     authwindow.appendChild(buttoncancel);
+    authwindow.appendChild(document.createElement("br"));
+    authwindow.appendChild(register);
     $(buttonok).bind("click", function() {
         kernel.login($(email).val(), $(password).val(), callback);
         $(email).val("");
@@ -319,32 +396,88 @@ util.renderAuthWindow = function(authwindow, callback) {
     });
 };
 
-util.renderAuthControls = function(authcontrols, mode, callback) {
+util.renderAccountWindow = function(accountwindow, callback) {
+    $(accountwindow).empty();
+    kernel.listregister(function(res) {
+        if (res.length == 0) {
+            location.href = "/";
+        }
+        $(res).each(function(index, email) {
+            var line = document.createElement("div");
+            var emailnode, killbtn;
+            emailnode = document.createElement("span");
+            $(emailnode).text(email);
+            killbtn = document.createElement("input");
+            $(killbtn).val("Remove").attr("type", "button").css({"text-align": "right", "margin-top": "3px"});
+            $(killbtn).click(function() {
+                kernel.unregister(email, function() {
+                    util.renderAccountWindow(accountwindow, callback);
+                });
+            });
+            line.appendChild(killbtn);
+            line.appendChild(emailnode);
+            accountwindow.appendChild(line);
+        });
+        var buttonclose = document.createElement("input");
+        $(buttonclose).attr("type", "button").val("Close");
+        $(buttonclose).bind("click", function() {
+            callback();
+        });
+        var register = document.createElement("span");
+        $(register).css({ "color": "black", "text-decoration": "underline", "cursor": "pointer"}).text("Add email").bind("click", function() {
+            kernel.register();
+            $(buttonclose).click();
+        });
+        accountwindow.appendChild(document.createElement("br"));
+        accountwindow.appendChild(buttonclose);
+        accountwindow.appendChild(document.createElement("br"));
+        accountwindow.appendChild(register);
+    });
+    $(accountwindow).css({"left": "50%",
+                      "margin-left": "-150px",
+                      "position": "fixed",
+                      "top": "30%",
+                      "width": "300px",
+                      "background-color": "white",
+                      "border": "1px solid black",
+                      "padding": "5px"
+    });
+};
+
+util.renderAuthControls = function(authcontrols, mode, callbackauth, callbackaccount) {
     $(authcontrols).empty();
+    var account = document.createElement("span");
     var signin = document.createElement("span");
-    signin.appendChild(document.createTextNode("Sign in"));
     var signout = document.createElement("span");
-    signout.appendChild(document.createTextNode("Sign out"));
-    $(signin).css({ "color": "black", "text-decoration": "underline", "cursor": "pointer" });
-    $(signout).css({ "color": "black", "text-decoration": "underline", "cursor": "pointer"});
+    $(account).text("Manage account").css({ "color": "black", "text-decoration": "underline", "cursor": "pointer","margin-right": "10px" });
+    $(signin).text("Sign in").css({ "color": "black", "text-decoration": "underline", "cursor": "pointer","margin-right": "10px" });
+    $(signout).text("Sign out").css({ "color": "black", "text-decoration": "underline", "cursor": "pointer", "margin-left": "10px", "margin-right": "10px"});
+    authcontrols.appendChild(account);
     authcontrols.appendChild(signin);
     authcontrols.appendChild(signout);
     if (mode == false) {
         $(signin).css("display", "inline");
         $(signout).css("display", "none");
+        $(account).css("display", "none");
     }
     else {
+        $(account).css("display", "inline");
         $(signin).css("display", "none");        
         $(signout).css("display", "inline");
     }
+    $(account).bind("click", function() {
+       callbackaccount(); 
+    });
     $(signin).bind("click", function() {
-        callback();
+        callbackauth();
     });
     $(signout).bind("click", function() {
         kernel.logout();
-        util.renderAuthControls(authcontrols, false, callback);
+        util.renderAuthControls(authcontrols, false, callbackauth);
     });
 };
+
+
 
 $(document).bind("ready", function() {
     kernel.connect(function() {

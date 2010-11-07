@@ -21,6 +21,7 @@ from werkzeug import Local, LocalManager
 
 import smtplib
 from email.mime.text import MIMEText
+from simplejson import dumps as tojson, loads as fromjson
 
 local = Local()
 local_manager = LocalManager([local])
@@ -32,6 +33,13 @@ local.User = []
 local.MethodEmail = []
 
 configfile = ""
+
+def __Invite_init__(self, pin):
+    self.pin = pin
+    self.uid = 0
+
+def __Invite_repr__(self):
+    return "<Invite('%s', %d)>" % (self.pin, self.uid)
 
 def __User_init__(self):
     pass
@@ -46,6 +54,16 @@ def __MethodEmail_init__(self, uid, email, password):
 
 def __MethodEmail_repr__(self):
     return "<MethodEmail(%d => %s)>" % (self.uid, self.email)
+
+def makeInvite(base):
+    return new.classobj("invite", (base, ), {
+        "__tablename__": 'invite',
+        "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
+        "__init__": __User_init__,
+        "__repr__": __User_repr__,
+        "pin": Column(String(4), primary_key=True),
+        "uid": Column(Integer)
+    })
 
 def makeUser(base):
     return new.classobj("user", (base, ), {
@@ -67,6 +85,19 @@ def makeMethodEmail(base):
         "uid": Column(Integer)
     })
 
+def message(msg):
+    return """<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Infiniboard registration</title>
+        <script type="text/javascript">
+        var RecaptchaOptions = {theme: 'clean'};
+        </script>
+    </head>
+    <body onload="setTimeout('window.close()', 5000)" style="background-image: url(/logo.png); background-repeat: no-repeat; background-position: center center; background-attachment: fixed">
+        <h3>%s</h3>
+    </body>
+    </html>""" % msg
 
 # Ported from Recipe 3.9 in Secure Programming Cookbook for C and C++ by
 # John Viega and Matt Messier (O'Reilly 2003)
@@ -126,21 +157,34 @@ class Warden(object):
 
     def __register(self, req):
         if not req.values.has_key("method"):
-            return ["You must provide a registration method"]
+            return [message("You must select a registration method")]
+        Config = ConfigParser()
+        Config.read(configfile)
+        if Config.has_section("Global") and Config.has_option("Global", "invite") and Config.get("Global", "invite") == "on":
+            invitemarkup = """
+                    <span>Please enter your invite code:</span><br/>
+                    <input type="text" size="6" name="invite" style="border: 1px solid black" /><br/>"""
+        else:
+            invitemarkup = ""
         method = req.values["method"]
+        uid = self.__uid(req)
+        if uid:
+            uidurl = "?uid=" + req.values["uid"]
+        else:
+            uidurl = ""
         if method == "email":
             return ["""<!DOCTYPE html>
             <html>
             <head>
-                <title>Please enter the email address</title>
+                <title>Infiniboard registration</title>
                 <script type="text/javascript">
                 var RecaptchaOptions = {theme: 'clean'};
                 </script>
             </head>
-            <body>
-                <form action="/regemail1" method="post">
+            <body style="background-image: url(/logo.png); background-repeat: no-repeat; background-position: center center; background-attachment: fixed">
+                <form action="/regemail1""" + uidurl + """" method="post">
                     <span>Please enter the email address:</span><br/>
-                    <input type="text" size="45" name="email" style="border: 1px solid black; width: 302px" /><br/>
+                    <input type="text" size="24" name="email" style="border: 1px solid black" /><br/>""" + invitemarkup + """
                     <span>Please enter the two words below:</span><br/>
                     <script type="text/javascript" src="http://www.google.com/recaptcha/api/challenge?k=6LfzRL0SAAAAALYxeIddE1g7Eqq-UP-jYHYRBwS3"></script>
                     <noscript>
@@ -153,18 +197,28 @@ class Warden(object):
             </body>
             </html>"""]
         else:
-            return ["Method not supported"]
+            return [message("Method not supported")]
 
 
     def __addEmailAuth1(self, req):
         if not req.values.has_key("email"):
-            return ["You must provide an email address"]
+            return [message("You must provide an email address")]
         email = req.values["email"]
         if not isValidAddress(email):
-            return ["Invalid email address"]
-        
+            return [message("Invalid email address")]
+        Config = ConfigParser()
+        Config.read(configfile)
+        if Config.has_section("Global") and Config.has_option("Global", "invite") and Config.get("Global", "invite") == "on":
+            if not req.values.has_key("invite"):
+                return [message("Invite PIN code not specified")]
+            session = Session[0]()
+            if session.query(Invite[0]).filter_by(pin=req.values["invite"], uid=0).count() == 0:
+                return [message("Invalid PIN code")]
+            invitecode = "&invite=%s" % req.values["invite"]
+        else:
+            invitecode = ""
         if not req.values.has_key("recaptcha_challenge_field") or not req.values.has_key("recaptcha_response_field"):
-            return ["No CAPTCHA received"]
+            return [message("No CAPTCHA received")]
         
         rc = {}
         rc["privatekey"] = secret.RecaptchaKey
@@ -174,53 +228,70 @@ class Warden(object):
         res = urlopen("http://www.google.com/recaptcha/api/verify", urlencode(rc)).read().split("\n")
         
         if res[0] == "false":
-            return [res[1]]
-        
+            return [message("reCAPTCHA reports a problem: " + res[1])]
+
+        uid = self.__uid(req)
         session = Session[0]()
         query = session.query(MethodEmail[0]).filter_by(email=email)
-        uid = self.__uid(req)
         token = str(uuid4())
         if uid == None and query.count() == 0:
             # New user
+            print "New user"
             self.mc.set("tmptoken_" + token, "%s" % (email), 3600)
         elif query.count() == 1 and query.one().uid == uid and uid != None:
             # Setting a new password
+            print "Setting new password"
             self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
         elif query.count() == 0 and uid != None:
             # Adding a new email
+            print "Adding an email"
             self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
         else:
-            return ["Permission denied"]
+            return [message("Error: email already registered.")]
 
         try:
-            msg = MIMEText('<a href="%sregemail2?token=%s">Complete the registration process</a>' % (req.host_url, token), "html", "utf-8")
-            msg['Subject'] = 'Spooce registration'
-            msg['From'] = 'noreply@spooce.com'
+            msg = MIMEText('<a href="%sregemail2?token=%s%s">Complete the registration process</a>' % (req.host_url, token, invitecode), "html", "utf-8")
+            msg['Subject'] = 'Infiniboard registration'
+            msg['From'] = 'noreply@infiniboard.net'
             msg['To'] = email
             s = smtplib.SMTP()
             s.connect()
-            s.sendmail('noreply@spooce.com', [email], msg.as_string())
+            s.sendmail('noreply@infiniboard.net', [email], msg.as_string())
             s.quit()
             session.close()
         except:
             logging.error("__addEmailAuth1 failure", exc_info=1)
-            return ["Internal server error"]
-        return ["Authentication email sent to the specified address."]
+            return [message("Internal server error")]
+        return [message("An authentication email has been sent to the specified address.")]
     
 
     def __addEmailAuth2(self, req):
         if not req.values.has_key("token"):
-            return ["Access denied"]
+            return [message("Access denied")]
         token = req.values["token"]
         try:
             token = self.mc.get("tmptoken_" + str(token))
         except:
             logging.error("__addEmailAuth2 failure", exc_info=1)
-            return ["Internal server error"]
+            return [message("Internal server error")]
         
         if token is None:
-            return ["Token does not exist or has expired"]
-        
+            return [message("Token does not exist or has expired")]
+
+        Config = ConfigParser()
+        Config.read(configfile)
+        if Config.has_section("Global") and Config.has_option("Global", "invite") and Config.get("Global", "invite") == "on":
+            if not req.values.has_key("invite"):
+                return [message("Invite PIN code not specified")]
+            session = Session[0]()
+            if session.query(Invite[0]).filter_by(pin=req.values["invite"], uid=0).count() == 0:
+                return [message("Invalid PIN code")]
+            invitemarkup = """
+                <input type="hidden" name="invite" value="%s" />
+                <br/>""" % req.values["invite"]
+        else:
+            invitemarkup = ""
+
         page = """<!DOCTYPE html>
         <html>
         <head>
@@ -239,11 +310,11 @@ class Warden(object):
             }
             </script>
         </head>
-        <body onload="init()">
+        <body onload="init()" style="background-image: url(/logo.png); background-repeat: no-repeat; background-position: center center; background-attachment: fixed">
             <form action="/regemail3" method="post">
                 <span>Please enter the password:</span>
-                <input type="hidden" name="token" value="__TOKEN__" />
-                <br/>
+                <input type="hidden" name="token" value="%s" />
+                <br/>""" % req.values["token"] + invitemarkup + """
                 <input id="password" type="password" size="20" name="password" style="border: 1px solid black" />
                 <br/>
                 <input id="mode" type="checkbox" /><label for="mode">Show password</label>
@@ -252,13 +323,13 @@ class Warden(object):
             </form>
         </body>
         </html>
-        """.replace("__TOKEN__", req.values["token"])
+        """
         return [page]
 
 
     def __addEmailAuth3(self, req):
         if not req.values.has_key("token") or not req.values.has_key("password"):
-            return ["Access denied"]
+            return [message("Access denied")]
         mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
         mac.update(req.values["password"].encode('utf8'))
         password = mac.digest().encode('base64').strip()
@@ -266,15 +337,26 @@ class Warden(object):
             token = self.mc.get("tmptoken_" + str(req.values["token"]))
         except:
             logging.error("__addEmailAuth3 failure", exc_info=1)
-            return ["Internal server error"]
+            return [message("Internal server error")]
 
         if token is None:
-            return ["Token does not exist or has expired"]
+            return [message("Token does not exist or has expired")]
+
+        Config = ConfigParser()
+        Config.read(configfile)
+        useinvite = False
+        if Config.has_section("Global") and Config.has_option("Global", "invite") and Config.get("Global", "invite") == "on":
+            if not req.values.has_key("invite"):
+                return [message("Invite PIN code not specified")]
+            session = Session[0]()
+            if session.query(Invite[0]).filter_by(pin=req.values["invite"], uid=0).count() == 0:
+                return [message("Invalid PIN code")]
+            useinvite = True
 
         token = token.split()
         self.mc.delete("tmptoken_" + str(req.values["token"]))
         if len(token) == 0:
-            return ["Token empty"]
+            return [message("Token empty")]
         elif len(token) == 1:
             email = token[0]
             session = Session[0]()
@@ -282,6 +364,9 @@ class Warden(object):
             session.add(u)
             session.flush()
             uid = u.uid
+            if useinvite:
+                invite = session.query(Invite[0]).filter_by(pin=req.values["invite"], uid=0).one()
+                invite.uid = uid
             session.commit()
             session.close()
         else:
@@ -290,7 +375,7 @@ class Warden(object):
                 uid = int(uid)
             except:
                 logging.error("__addEmailAuth3 failure", exc_info=1)
-                return ["Invalid UID"]
+                return [message("Invalid UID")]
         
         session = Session[0]()
         try:
@@ -298,48 +383,66 @@ class Warden(object):
                 session.add(MethodEmail[0](uid, email, password))
                 session.commit()
                 session.close()
-                return ["Email authentication added"]
+                return [message("Email authentication added")]
             else:
                 session.query(MethodEmail[0]).filter_by(email=email, uid=uid).one().password = password
                 session.commit()
                 session.close()
-                return ["Email password changed"]
+                return [message("Password successfully updated")]
         except:
             logging.error("__addEmailAuth3 failure", exc_info=1)
             session.close()
-            return ["Internal server error"]
+            return [message("Internal server error")]
 
 
-    def __removeEmailAuth(self):
+    def __listEmailAuth(self, req):
+        uid = self.__uid(req)
+        if uid == None:
+            print "a"
+            return ["[]"]
+        try:
+            uid = int(uid)
+        except:
+            print "b"
+            logging.error("__listEmailAuth failure", exc_info=1)
+            return ["[]"]
+        emails = []
+        session = Session[0]()
+        print "UID is", uid
+        for e in session.query(MethodEmail[0]).filter_by(uid=uid).all():
+            emails.append(e.email)
+        return [tojson(emails)]
+
+
+    def __removeEmailAuth(self, req):
         if not req.values.has_key("email"):
-            return ["You must provide an email address"]
+            return [message("You must provide an email address")]
         email = req.values["email"]
         if not isValidAddress(email):
-            return ["Invalid email address"]
+            return [message("Invalid email address")]
         
         uid = self.__uid(req)
         if uid == None:
-            return ["Permission denied"]
+            return [message("Permission denied")]
         try:
             uid = int(uid)
         except:
             logging.error("__removeEmailAuth failure", exc_info=1)
-            return ["Invalid UID"]
+            return [message("Invalid UID")]
         session = Session[0]()
-        query = session.query(MethodEmail[0]).filter_by(email=email,uid=uid)
-        token = str(uuid4())
-        if uid == None and query.count() == 0:
-            # New user
-            self.mc.set("tmptoken_" + token, "%s" % (email), 3600)
-        elif query.count() == 1 and query.one().uid == uid and uid != None:
-            # Setting a new password
-            self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
-        elif query.count() == 0 and uid != None:
-            # Adding a new email
-            self.mc.set("tmptoken_" + token, "%s %s" % (email, uid), 3600)
+        if session.query(MethodEmail[0]).filter_by(email=email,uid=uid).count() == 0:
+            session.close()
+            return [message("This email doesn't belong to your account")]
         else:
-            return ["Permission denied"]
-
+            session.delete(session.query(MethodEmail[0]).filter_by(email=email,uid=uid).one())
+            session.commit()
+            if session.query(MethodEmail[0]).filter_by(uid=uid).count() == 0:
+                session.close()
+                return [message("You have deleted your last authentication method. Your account is now disabled.")]
+            else:
+                session.close()
+                return [message("Email authentication method removed. You can still access your account with other attached email addresses")]
+        
 
     def __authenticateByEmail(self, req):
         email, password = req.values["email"], req.values["password"].encode('utf8')
@@ -357,7 +460,7 @@ class Warden(object):
             session.close()
             mac = hmac.new(secret.AuthSecret, None, hashlib.sha1)
             mac.update(uid)
-            return quote("%s %s" % (mac.digest().encode('base64').strip(), uid))
+            return "%s %s" % (mac.digest().encode('base64').strip(), uid)
 
 
     def __uid(self, req):
@@ -405,7 +508,7 @@ class Warden(object):
             resp.response = self.__register(req)
             return resp(env, start_response)
         elif req.path == '/regemail1':
-            resp.content_type = "text/plain"
+            resp.content_type = "text/html"
             resp.response = self.__addEmailAuth1(req)
             return resp(env, start_response)
         elif req.path == '/regemail2':
@@ -413,8 +516,16 @@ class Warden(object):
             resp.response = self.__addEmailAuth2(req)
             return resp(env, start_response)
         elif req.path == '/regemail3':
-            resp.content_type = "text/plain"
+            resp.content_type = "text/html"
             resp.response = self.__addEmailAuth3(req)
+            return resp(env, start_response)
+        elif req.path == '/regemailkill':
+            resp.content_type = "text/html"
+            resp.response = self.__removeEmailAuth(req)
+            return resp(env, start_response)
+        elif req.path == '/regemaillist':
+            resp.content_type = "text/plain"
+            resp.response = self.__listEmailAuth(req)
             return resp(env, start_response)
         elif req.path == '/auth' and req.values.has_key("email") and req.values.has_key("password"):
             resp.content_type = "text/plain"
