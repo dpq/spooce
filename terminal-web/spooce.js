@@ -105,17 +105,21 @@ kernel.disconnect = function() {
 };
 
 
-kernel.login = function(email, password) {
+kernel.login = function(email, password, callback) {
     $.ajax({
         url: "/auth",
         dataType: "text",
         type: "POST",
         data: {"email": email, "password": password},
         success: function(result) {
-            kernel.uidhash = result;
-            kernel.uid = result.split("+")[1];
-            alert(kernel.uidhash);
-            alert(kernel.uid);
+            if (result == "") {
+                callback(false);
+            }
+            else {
+                kernel.uidhash = result;
+                kernel.uid = result.split("+")[1];
+                callback(true);
+            }
         }
     });
 };
@@ -271,37 +275,75 @@ util.authCookie = function() {
     
 };
 
-util.renderAuthEmail = function(node) {
+util.renderAuthWindow = function(authwindow, callback) {
     var email = document.createElement("input");
     $(email).attr("type", "text").attr("size", "24");
     var password = document.createElement("input");
     $(password).attr("type", "password").attr("size", "24");
-    var button = document.createElement("input");
-    $(button).attr("type", "submit").attr("value", "Log In");
+    var buttonok = document.createElement("input");
+    $(buttonok).attr("type", "submit").attr("value", "Sign In");
+    var buttoncancel = document.createElement("input");
+    $(buttoncancel).attr("type", "submit").attr("value", "Cancel");
     var text1 = document.createElement("span");
     text1.appendChild(document.createTextNode("Please enter the email address:"));
     var text2 = document.createElement("span");
     text2.appendChild(document.createTextNode("Please enter the password:"));
-    node.appendChild(text1);
-    node.appendChild(document.createElement("br"));
-    node.appendChild(email);
-    node.appendChild(document.createElement("br"));
-    node.appendChild(text2);
-    node.appendChild(document.createElement("br"));
-    node.appendChild(password);
-    node.appendChild(document.createElement("br"));
-    node.appendChild(button);
-    $(button).bind("click", function() {
-        kernel.login($(email).val(), $(password).val());
+    authwindow.appendChild(text1);
+    authwindow.appendChild(document.createElement("br"));
+    authwindow.appendChild(email);
+    authwindow.appendChild(document.createElement("br"));
+    authwindow.appendChild(text2);
+    authwindow.appendChild(document.createElement("br"));
+    authwindow.appendChild(password);
+    authwindow.appendChild(document.createElement("br"));
+    authwindow.appendChild(buttonok);
+    authwindow.appendChild(buttoncancel);
+    $(buttonok).bind("click", function() {
+        kernel.login($(email).val(), $(password).val(), callback);
+        $(email).val("");
+        $(password).val("");
+    });
+    $(buttoncancel).bind("click", function() {
+        callback(false);
+        $(email).val("");
+        $(password).val("");
+    });
+    $(authwindow).css({"left": "50%",
+                      "margin-left": "-100px",
+                      "position": "fixed",
+                      "top": "30%",
+                      "width": "200px",
+                      "background-color": "white",
+                      "border": "1px solid black",
+                      "padding": "5px"
     });
 };
 
-util.renderLogOut = function(node) {
-    var button = document.createElement("input");
-    $(button).attr("type", "submit").attr("value", "Log Out").bind("click", function() {
-        kernel.logout();
+util.renderAuthControls = function(authcontrols, mode, callback) {
+    $(authcontrols).empty();
+    var signin = document.createElement("span");
+    signin.appendChild(document.createTextNode("Sign in"));
+    var signout = document.createElement("span");
+    signout.appendChild(document.createTextNode("Sign out"));
+    $(signin).css({ "color": "black", "text-decoration": "underline", "cursor": "pointer" });
+    $(signout).css({ "color": "black", "text-decoration": "underline", "cursor": "pointer"});
+    authcontrols.appendChild(signin);
+    authcontrols.appendChild(signout);
+    if (mode == false) {
+        $(signin).css("display", "inline");
+        $(signout).css("display", "none");
+    }
+    else {
+        $(signin).css("display", "none");        
+        $(signout).css("display", "inline");
+    }
+    $(signin).bind("click", function() {
+        callback();
     });
-    node.appendChild(button);
+    $(signout).bind("click", function() {
+        kernel.logout();
+        util.renderAuthControls(authcontrols, false, callback);
+    });
 };
 
 $(document).bind("ready", function() {
