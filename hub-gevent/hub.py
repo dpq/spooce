@@ -172,30 +172,39 @@ class Hub(object):
             logging.error("__connect failure", exc_info=1)
             return [tojson({'status': 1, 'errmsg': 'An error has occured. Please contact tech support.'})]
 
+    def vacuum(self, domain, tid, release=False):
+        if locks.has_key(tid.encode('utf8')):
+            locks[tid.encode('utf8')].acquire()
+            self.mc.delete("%s_inbox" % tid.encode('utf8'))
+            self.mc.delete("%s_last_seen" % tid.encode('utf8'))
+            locks[tid.encode('utf8')].release()
+            del locks[tid.encode('utf8')]
+        session = Session[domain]()
+        if session.query(Terminal[domain]).filter_by(tid=tid).one().key == "" or release == True:
+            session.delete(session.query(Terminal[domain]).filter_by(tid=tid).one())
+        deadsubscriptions = []
+        session.query(Subscription[domain]).filter(Subscription[domain].subscriber.op('regexp')('^/%s' % tid)).delete('fetch')
+        for s in session.query(Subscription[domain]).filter(Subscription[domain].publisher.op('regexp')('^/%s' % tid)).all():
+            deadsubscriptions.append(s.subscriber, s.publisher)
+        session.query(Subscription[domain]).filter(Subscription[domain].publisher.op('regexp')('^/%s' % tid)).delete('fetch')
+        session.commit()
+        session.close()
+        for i in range(0, len(deadsubscriptions)):
+            self.__push(domain, {"src": tid, "event": "kill", "appid": deadsubscriptions[i][1], "dst": deadsubscriptions[i][0] })
+        self.__push(domain, {"event": "disconnect", "tid": "/%s" % tid, "src": "/%s" % self.hubid})            
+        return [tojson({'status': 0})]
 
     def __disconnect(self, req):
         try:
             domain = self.__domain(req)
-            session = Session[domain]()
             tid = self.__tid(req)
             if not tid:
                 return [tojson({'status': 2, 'errmsg': 'Authentication error.'})]
-            if locks.has_key(tid.encode('utf8')):
-                locks[tid.encode('utf8')].acquire()
-                self.mc.delete("%s_inbox" % tid.encode('utf8'))
-                self.mc.delete("%s_last_seen" % tid.encode('utf8'))
-                locks[tid.encode('utf8')].release()
-                del locks[tid.encode('utf8')]
-            if session.query(Terminal[domain]).filter_by(tid=tid).one().key == "" or (req.args.has_key("release") and req.args["release"] == 1):
-                session.delete(session.query(Terminal[domain]).filter_by(tid=tid).one())
-            session.commit()
-            session.close()
-            self.__push(domain, {"event": "disconnect", "tid": "/%s" % tid, "src": "/%s" % self.hubid})
-            return [tojson({'status': 0})]
+            release = (req.args.has_key("release") and req.args["release"] == "1")
+            return self.vacuum(domain, tid, release)
         except:
             logging.error("__disconnect failure", exc_info=1)
             return [tojson({'status': 1, 'errmsg': 'An error has occured. Please contact tech support.'})]
-
 
     def __mx(self, req):
         try:
@@ -413,7 +422,7 @@ class Hub(object):
 
 def main():
     global configfile
-    configfile, port, log = default.config, default.mxport, default.mxlog
+    configfile, port, log, ttl = default.config, default.mxport, default.mxlog, int(default.ttl)
     Base = {}
 
     try:
@@ -445,6 +454,16 @@ def main():
 
     if not Config.has_option('Global', 'wardens') or Config.get('Global', 'wardens') == "":
         print "No wardens specified; the system is not functional"
+        sys.exit(1)
+
+    if Config.has_option('Global', 'ttl'):
+        try:
+            ttl = int(Config.get('Global', 'ttl'))
+        except:
+            print "Bad time to live specified in the config file, aborting."
+            sys.exit(1)            
+    else:
+        print "Time to live not specified in the config file, aborting."
         sys.exit(1)
 
     logging.basicConfig(filename=log,
@@ -504,10 +523,22 @@ def main():
         logging.error("MemCache daemon connection failure", exc_info=1)
         sys.exit(1)
             
-    logging.info("Generating a random hub ID.")
-    HubID = uuid.uuid4().hex
 
     hub = Hub()
+
+    if len(args) == 1 and args[0] == "vacuum":
+        for domain in secret.MySQL.keys():
+            session = Session[domain]()
+            tids = []
+            for t in session.query(Terminal[domain]).filter(Terminal[domain].last_seen < datetime.now() - timedelta(seconds=ttl)).all():
+                tids.append(t.tid)
+            session.close()
+            for tid in tids:
+                hub.vacuum(domain, tid)
+        exit()
+
+    logging.info("Generating a random hub ID.")
+    HubID = uuid.uuid4().hex
 
     repos = Config.get('Global', 'repos').split(",")
     for repo in repos:
@@ -524,7 +555,7 @@ def main():
             hub.wardens.append(warden)
 
     if len(hub.wardens) == 0:
-        print "No repositories specified; the system is not functional"
+        print "No wardens specified; the system is not functional"
         sys.exit(1)
 
 
