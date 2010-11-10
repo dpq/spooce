@@ -126,6 +126,7 @@ class Kernel:
         self.__url = hubURL
         request = self.__url + "connect?tid=%s&key=%s" % (self.__ID, self.__KEY)
         result = {}
+        self.messageCheckingTimer = 0.2
         try:
             r = urlopen(request)
             content = r.read()
@@ -212,7 +213,8 @@ class Kernel:
             pass
 
     def correctMessageSrc(self, message):
-        src = "/" + self.__ID
+        return "/" + self.__ID + "/" + message["src"].strip("/").split("/", 1)[-1]
+        """src = "/" + self.__ID
         if message["src"] == None or message["src"] == '/' or message["src"] == src:
             return src
         stripsrc = message["src"].strip("/").split("/", 1)
@@ -221,9 +223,9 @@ class Kernel:
             return src
         if stripsrc[0] != self.__ID:
             src += "/" + stripsrc[0] # + "/" + stripsrc[1]
-        else:
+        elif len(stripsrc) == 2:
             src += "/" + stripsrc[1]
-        return src
+        return src"""
 
     def correctMessageDst(message):
         return
@@ -290,13 +292,13 @@ class Kernel:
                         if not opt.instance.has_key(dst):
                             message.setStatus(message.NO_SUCH_DST)
                         else:
-#                            try:
-                            if 1:
+                            try:
+#                            if 1:
                                 opt.instance[dst].mx(message)
-#                            except:
-#                                skp = dst
-#                                log.error("Message not send to mx. Skipped. Original:\n%s\n" % str(debugcopy))
-#                                message.setStatus(message.MX_APP_ERROR)
+                            except:
+                                skp = dst
+                                log.error("Message not send to mx. Skipped. Original:\n%s\n" % str(debugcopy))
+                                message.setStatus(message.MX_APP_ERROR)
                 else:
                     message.setStatus(message.BAD_DST)
 #            if message["status"] != 0:
