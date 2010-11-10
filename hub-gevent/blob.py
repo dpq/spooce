@@ -20,6 +20,7 @@ local = Local()
 local_manager = LocalManager([local])
 
 configfile = ""
+engine = None
 Session = local('Session')
 FileEntry = local('FileEntry')
 local.Session = []
@@ -110,8 +111,8 @@ class Blob(object):
             params[param] = Config.get("BlobStore", param)
         req = Request(env)
         resp = Response(status=200, content_type="text/plain")
-        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
-            (params["user"], secret.BlobSecret, params["host"], params["port"], params["database"]), pool_recycle=3600)
+        #engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+        #    (params["user"], secret.BlobSecret, params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base = declarative_base(bind=engine)
         local.Session = []
         local.FileEntry = []
@@ -135,7 +136,7 @@ class Blob(object):
 
 
 def main():
-    global configfile
+    global configfile, engine
     configfile, port, log = default.config, default.fxport, default.fxlog
     Base = {}
 
