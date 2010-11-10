@@ -196,7 +196,7 @@ class Kernel:
         t = Thread(target = opt.instance[appid].main, name = str(meta) + str(Args), args = (appid, Args, ))
         t.start()
         self.process = {pid : t}
-        self.sendMessage({"event": "run", "appid": "/" + self.__ID + "/" + appid})
+        self.sendMessage({"src" : "/" + self.__ID, "event": "run", "appid": "/" + self.__ID + "/" + appid})
         return True
 
     def kill(self, meta):
@@ -213,19 +213,10 @@ class Kernel:
             pass
 
     def correctMessageSrc(self, message):
+        if message["src"] == None:
+            print message
+            return "/" + self.__ID
         return "/" + self.__ID + "/" + message["src"].strip("/").split("/", 1)[-1]
-        """src = "/" + self.__ID
-        if message["src"] == None or message["src"] == '/' or message["src"] == src:
-            return src
-        stripsrc = message["src"].strip("/").split("/", 1)
-        if len(stripsrc) > 2:
-            logging.error("bad src : " + message["src"])
-            return src
-        if stripsrc[0] != self.__ID:
-            src += "/" + stripsrc[0] # + "/" + stripsrc[1]
-        elif len(stripsrc) == 2:
-            src += "/" + stripsrc[1]
-        return src"""
 
     def correctMessageDst(message):
         return
