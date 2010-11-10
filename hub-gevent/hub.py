@@ -26,6 +26,7 @@ from sqlalchemy import Table, Column, MetaData, Index, desc, create_engine
 
 import secret, default
 configfile = ""
+engine = None
 local = Local()
 local_manager = LocalManager([local])
 
@@ -132,6 +133,9 @@ class Hub(object):
                     session.close()
                     return [tojson({'status': 3, 'errmsg': 'Invalid TID supplied.'})]
                 tid, key = req.args['tid'], req.args['key']
+                print tid.encode('utf8')
+                print "%s_inbox" % tid.encode('utf8'), self.mc.get("%s_inbox" % tid.encode('utf8'))
+                print "%s_last_seen" % tid.encode('utf8'), self.mc.get("%s_last_seen" % tid.encode('utf8'))
                 if self.mc.get("%s_inbox" % tid.encode('utf8')) or self.mc.get("%s_last_seen" % tid.encode('utf8')):
                     session.close()
                     return [tojson({'status': 4, 'errmsg': 'Already connected.'})]
@@ -179,6 +183,10 @@ class Hub(object):
             self.mc.delete("%s_last_seen" % tid.encode('utf8'))
             locks[tid.encode('utf8')].release()
             del locks[tid.encode('utf8')]
+        else:
+            for record in ["%s_inbox" % tid.encode('utf8'), "%s_last_seen" % tid.encode('utf8')]:
+                if self.mc.get(record):
+                    self.mc.delete(record)
         session = Session[domain]()
         if session.query(Terminal[domain]).filter_by(tid=tid).one().key == "" or release == True:
             session.delete(session.query(Terminal[domain]).filter_by(tid=tid).one())
@@ -395,8 +403,8 @@ class Hub(object):
                 print "Malformed configuration file: mission option %s in section %s" % (param, domain)
                 sys.exit(1)
             params[param] = Config.get(domain, param)
-        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
-            (params["user"], secret.MySQL[domain], params["host"], params["port"], params["database"]), pool_recycle=3600)
+        #engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+        #    (params["user"], secret.MySQL[domain], params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base[domain] = declarative_base(bind=engine)
         Session[domain] = sessionmaker(bind=engine)
         Terminal[domain] = makeTerminal(Base[domain], domain)
@@ -421,7 +429,7 @@ class Hub(object):
 
 
 def main():
-    global configfile
+    global configfile, engine
     configfile, port, log, ttl = default.config, default.mxport, default.mxlog, int(default.ttl)
     Base = {}
 
@@ -488,7 +496,7 @@ def main():
         params = {"host": "", "user": "", "database": "", "port": ""}
         for param in params:
             if not Config.has_option(domain, param):
-                print "Malformed configuration file: mission option %s in section %s" % (param, domain)
+                print "Malformed configuration file: missing option %s in section %s" % (param, domain)
                 sys.exit(1)
             params[param] = Config.get(domain, param)
  
@@ -525,6 +533,7 @@ def main():
             
 
     hub = Hub()
+    hub.mc = mc
 
     if len(args) == 1 and args[0] == "vacuum":
         for domain in secret.MySQL.keys():
@@ -558,8 +567,6 @@ def main():
         print "No wardens specified; the system is not functional"
         sys.exit(1)
 
-
-    hub.mc = mc
     locks[HubID.encode('utf8')] = RLock()
     locks[HubID.encode('utf8')].acquire()
     hub.mc.set("%s_inbox" % HubID.encode('utf8'), "[]")

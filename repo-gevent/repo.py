@@ -20,6 +20,7 @@ import secret, default
 from werkzeug import Local, LocalManager
 
 configfile = ""
+engine = None
 local = Local()
 local_manager = LocalManager([local])
 Session = local('Session')
@@ -57,20 +58,20 @@ def __Package_repr__(self):
 
 class Repo(object):
     def __init__(self):
-        Config = ConfigParser()
-        Config.read(configfile)
-        params = {"host": "", "user": "", "database": "", "port": ""}
-        for param in params:
-            if not Config.has_option("MySQL", param):
-                print "Malformed configuration file: mission option %s in section MySQL" % (param)
-                sys.exit(1)
-            params[param] = Config.get("MySQL", param)
-        print params
-        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
-            (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
-        Base = declarative_base(bind=engine)
-        local.Session = sessionmaker(bind=engine)
-        local.Package = makePackage(Base)
+        pass
+        #Config = ConfigParser()
+        #Config.read(configfile)
+        #params = {"host": "", "user": "", "database": "", "port": ""}
+        #for param in params:
+        #    if not Config.has_option("MySQL", param):
+        #        print "Malformed configuration file: mission option %s in section MySQL" % (param)
+        #        sys.exit(1)
+        #    params[param] = Config.get("MySQL", param)
+        #engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+        #    (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
+        #Base = declarative_base(bind=engine)
+        #local.Session = sessionmaker(bind=engine)
+        #local.Package = makePackage(Base)
 
     def __upload(self, req):
         if req.method == "GET":
@@ -144,9 +145,9 @@ class Repo(object):
                 print "Malformed configuration file: mission option %s in section MySQL" % (param)
                 sys.exit(1)
             params[param] = Config.get("MySQL", param)
-        print params
-        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
-            (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
+        #print params
+        #engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+        #    (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base = declarative_base(bind=engine)
         local.Session = []
         local.Package = []
@@ -176,7 +177,7 @@ class Repo(object):
 
 
 def main():
-    global configfile
+    global configfile, engine
     configfile, port, log = default.config, default.port, default.log
     
     try:
@@ -224,7 +225,6 @@ def main():
         params[param] = Config.get("MySQL", param)
  
     try:
-        print params
         engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
             (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base = declarative_base(bind=engine)

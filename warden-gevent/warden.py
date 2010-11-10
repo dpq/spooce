@@ -33,6 +33,7 @@ local.User = []
 local.MethodEmail = []
 
 configfile = ""
+engine = None
 
 def __Invite_init__(self, pin):
     self.pin = pin
@@ -493,8 +494,8 @@ class Warden(object):
                 print "Malformed configuration file: mission option %s in section MySQL" % (param)
                 sys.exit(1)
             params[param] = Config.get("MySQL", param)    
-        engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
-            (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
+        #engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=0" %
+        #    (params["user"], secret.MySQL, params["host"], params["port"], params["database"]), pool_recycle=3600)
         Base = declarative_base(bind=engine)
         local.Session = []
         local.User = []
@@ -545,7 +546,7 @@ class Warden(object):
 
 
 def main():
-    global configfile
+    global configfile, engine
     configfile, port, log = default.config, default.port, default.log
 
     try:
