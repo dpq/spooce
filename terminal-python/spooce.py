@@ -72,9 +72,9 @@ class Opt:
                     module.__dict__["opt"] = opt
                     exec src in module.__dict__
                     sys.modules[meta[0]] = module
-                except Exception as error:
+                except:# Exception as error:
                     log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
-                    log.error(str(error))
+                    #log.error(str(error))
                     result = False
             else:
                 result = False
@@ -224,7 +224,20 @@ class Kernel:
     def mxdaemon(self): # spooce.py, 425 TODO: Upload and download is economy well enough? Any optimization?
         """ The queue of outgoing messages. The whole queue is uploaded to the server
          by the mx() call, which also retrieves the server response."""
-        print "====TIME (minutes)====", (datetime.now() - self.dtstart).seconds/60.0
+        secs = (datetime.now() - self.dtstart).seconds
+        tm = ""
+        if secs < 60:
+            tm = "%.2f seconds" % secs
+        elif secs < 3600:
+            secs = int(secs)
+            tm = "minutes -- %s:%s" % (secs / 60.0, secs % 60)
+        elif secs < 86400:
+            secs = int(secs)
+            tm = "%s:%s:%s" % (str(secs / 3600), str((secs % 3600) / 60.0), str(secs % 60))
+        else:
+            secs = int(secs)
+            tm = "%s day(s) %s:%s:%s" % (secs / 86400, (secs % 86400) / 3600.0, (secs % 3600) / 60.0, secs % 60)
+        print "====UPTIME ====", tm
         log.info("Mxdaemon woke up")
         if self.__stopFlag:
             log.info("Mxdaemon quits.")
@@ -288,7 +301,7 @@ class Kernel:
                                 opt.instance[dst].mx(message)
                             except:
                                 skp = dst
-                                log.error("Message not send to mx. Skipped. Original:\n%s\n" % str(debugcopy))
+                                log.error("Message not send to mx or error in the msgprocessor. Original:\n%s\n" % str(debugcopy))
                                 message.setStatus(message.MX_APP_ERROR)
                 else:
                     message.setStatus(message.BAD_DST)
