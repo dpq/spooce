@@ -46,8 +46,6 @@ opt.package["image"]["1"] = function() {
         $(this.mask).css({"width": "100%", "height": "100%", "position" : "absolute", "background-color": "#888", "top": "0px", "left": "0px", "opacity": "0.75"});
         this.editor.setAttribute("type", "text");
         $(this.editor).css({"border":"2px solid white", "position" : "absolute", "height": "1.6em", "margin-left" : "auto", "margin-right" : "auto", "width": "20em"});
-//        alert(this.editor.style.text)
-//        alert(this.editor.style.listStyle)
         var typeHint = "Insert an image url here...";
         this.editor.value = typeHint;
         var EditorInstance = this.editor;
@@ -123,4 +121,4 @@ opt.package["image"]["1"] = function() {
             kernel.subscribe(appid, serverAddress, {"imgid": imageid});
         }
     };
-}
+};

@@ -11,8 +11,8 @@ kernel.runQueue = {};
 
 kernel.renderFactory = function(target) {
    return function(appid) {
-       var element = kernel.process[appid].render();
-       target.replaceWith(element);
+       var element = kernel.process[appid].render(target.parentNode);
+       target.parentNode.replaceChild(element, target);
        kernel.element[appid] = element;
    }
 };
@@ -154,7 +154,7 @@ kernel.register = function() {
         popup.focus()
     }
     return false;
-}
+};
 
 
 kernel.listregister = function(callback) {
@@ -172,7 +172,7 @@ kernel.listregister = function(callback) {
             }
         });
     }
-}
+};
 
 kernel.unregister = function(email, callback) {
     if (kernel.uidhash == "" || !email || email == "") {
@@ -198,7 +198,7 @@ kernel.unregister = function(email, callback) {
     }
     callback();
     return false;
-}
+};
 
 
 /* Initiate communication session with the hub; upload the message queue and download any messages already waiting in the inbox */
@@ -399,6 +399,7 @@ util.renderAuthWindow = function(authwindow, callback) {
 util.renderAccountWindow = function(accountwindow, callback) {
     $(accountwindow).empty();
     kernel.listregister(function(res) {
+        res = JSON.parse(res);
         if (res.length == 0) {
             location.href = "/";
         }
@@ -491,7 +492,10 @@ $(document).bind("ready", function() {
             if (entries[i].length > 1) {
                 args = entries[i][1];
             }
-            kernel.run(meta, args, kernel.renderFactory($(targets[i])));
+            for (var j in args) {
+                alert(j + " :: " + typeof args[j]);
+            }
+            kernel.run(meta, args, kernel.renderFactory(targets[i]));
         }
     });
     $(window).bind("unload", function() {

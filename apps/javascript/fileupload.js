@@ -1,8 +1,8 @@
-if (!opt.package["text"]) {
-    opt.package["text"] = {};
+if (!opt.package["fileupload"]) {
+    opt.package["fileupload"] = {};
 }
 
-opt.package["text"]["1"] = function() {
+opt.package["fileupload"]["1"] = function() {
     var appid;
     var stringid = "";
     this.node;
@@ -94,4 +94,4 @@ opt.package["text"]["1"] = function() {
             kernel.subscribe(appid, serverAddress, {"strid": stringid});
         }
     };
-};
+}
