@@ -72,9 +72,9 @@ class Opt:
                     module.__dict__["opt"] = opt
                     exec src in module.__dict__
                     sys.modules[meta[0]] = module
-                except Exception as error:
+                except:# Exception as error:
                     log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
-                    log.error(str(error))
+                    #log.error(str(error))
                     result = False
             else:
                 result = False
@@ -126,6 +126,7 @@ class Kernel:
         self.__url = hubURL
         request = self.__url + "connect?tid=%s&key=%s" % (self.__ID, self.__KEY)
         result = {}
+        self.messageCheckingTimer = 0.2
         try:
             r = urlopen(request)
             content = r.read()
@@ -195,7 +196,7 @@ class Kernel:
         t = Thread(target = opt.instance[appid].main, name = str(meta) + str(Args), args = (appid, Args, ))
         t.start()
         self.process = {pid : t}
-        self.sendMessage({"event": "run", "appid": "/" + self.__ID + "/" + appid})
+        self.sendMessage({"src" : "/" + self.__ID, "event": "run", "appid": "/" + self.__ID + "/" + appid})
         return True
 
     def kill(self, meta):
@@ -212,18 +213,10 @@ class Kernel:
             pass
 
     def correctMessageSrc(self, message):
-        src = "/" + self.__ID
-        if message["src"] == None or message["src"] == '/' or message["src"] == src:
-            return src
-        stripsrc = message["src"].strip("/").split("/", 1)
-        if len(stripsrc) > 2:
-            logging.error("bad src : " + message["src"])
-            return src
-        if stripsrc[0] != self.__ID:
-            src += "/" + stripsrc[0] # + "/" + stripsrc[1]
-        else:
-            src += "/" + stripsrc[1]
-        return src
+        if message["src"] == None:
+            print message
+            return "/" + self.__ID
+        return "/" + self.__ID + "/" + message["src"].strip("/").split("/", 1)[-1]
 
     def correctMessageDst(message):
         return
@@ -231,7 +224,20 @@ class Kernel:
     def mxdaemon(self): # spooce.py, 425 TODO: Upload and download is economy well enough? Any optimization?
         """ The queue of outgoing messages. The whole queue is uploaded to the server
          by the mx() call, which also retrieves the server response."""
-        print "====TIME (minutes)====", (datetime.now() - self.dtstart).seconds/60.0
+        secs = (datetime.now() - self.dtstart).seconds
+        tm = ""
+        if secs < 60:
+            tm = "%.2f seconds" % secs
+        elif secs < 3600:
+            secs = int(secs)
+            tm = "minutes -- %s:%s" % (secs / 60.0, secs % 60)
+        elif secs < 86400:
+            secs = int(secs)
+            tm = "%s:%s:%s" % (str(secs / 3600), str((secs % 3600) / 60.0), str(secs % 60))
+        else:
+            secs = int(secs)
+            tm = "%s day(s) %s:%s:%s" % (secs / 86400, (secs % 86400) / 3600.0, (secs % 3600) / 60.0, secs % 60)
+        print "====UPTIME ====", tm
         log.info("Mxdaemon woke up")
         if self.__stopFlag:
             log.info("Mxdaemon quits.")
@@ -290,13 +296,13 @@ class Kernel:
                         if not opt.instance.has_key(dst):
                             message.setStatus(message.NO_SUCH_DST)
                         else:
-#                            try:
-                            if 1:
+                            try:
+#                            if 1:
                                 opt.instance[dst].mx(message)
-#                            except:
-#                                skp = dst
-#                                log.error("Message not send to mx. Skipped. Original:\n%s\n" % str(debugcopy))
-#                                message.setStatus(message.MX_APP_ERROR)
+                            except:
+                                skp = dst
+                                log.error("Message not send to mx or error in the msgprocessor. Original:\n%s\n" % str(debugcopy))
+                                message.setStatus(message.MX_APP_ERROR)
                 else:
                     message.setStatus(message.BAD_DST)
 #            if message["status"] != 0:
