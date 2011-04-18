@@ -67,6 +67,7 @@ class Opt:
             if src != None:
 #                try:
                 if 1:
+                    print "Trying to compile"
                     module = imp.new_module(meta[0])
                     module.__dict__["kernel"] = kernel
                     module.__dict__["opt"] = opt
