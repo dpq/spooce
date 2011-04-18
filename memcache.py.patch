@@ -1,0 +1,11 @@
+--- /home/jcowles/Download/python-memcached-1.45/memcache.py	2010-09-01 12:53:40.615960000 -0700
++++ memcache.py	2010-08-31 11:04:31.517060834 -0700
+@@ -870,6 +870,8 @@
+     def _expectvalue(self, server, line=None):
+         if not line:
+             line = server.readline()
++        if not line:
++            return (None, None, None)
+ 
+         if line[:5] == 'VALUE':
+             resp, rkey, flags, len = line.split()

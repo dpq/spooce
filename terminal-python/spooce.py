@@ -72,9 +72,9 @@ class Opt:
                     module.__dict__["opt"] = opt
                     exec src in module.__dict__
                     sys.modules[meta[0]] = module
-                except Exception as error:
+                except:# Exception as error:
                     log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
-                    log.error(str(error))
+                    #log.error(str(error))
                     result = False
             else:
                 result = False
@@ -233,10 +233,10 @@ class Kernel:
             tm = "minutes -- %s:%s" % (secs / 60.0, secs % 60)
         elif secs < 86400:
             secs = int(secs)
-            tm = "%s:%s:%s" % (str(secs / 3600), str((secs % 3600) / 60), str(secs % 60))
+            tm = "%s:%s:%s" % (str(secs / 3600), str((secs % 3600) / 60.0), str(secs % 60))
         else:
             secs = int(secs)
-            tm = "%s day(s) %s:%s:%s" % (secs / 86400, (secs % 86400) / 3600, (secs % 3600) / 60.0, secs % 60)
+            tm = "%s day(s) %s:%s:%s" % (secs / 86400, (secs % 86400) / 3600.0, (secs % 3600) / 60.0, secs % 60)
         print "====UPTIME ====", tm
         log.info("Mxdaemon woke up")
         if self.__stopFlag:
@@ -296,13 +296,13 @@ class Kernel:
                         if not opt.instance.has_key(dst):
                             message.setStatus(message.NO_SUCH_DST)
                         else:
-#                            try:
-                            if 1:
+                            try:
+#                            if 1:
                                 opt.instance[dst].mx(message)
-#                            except:
-#                                skp = dst
-#                                log.error("Message not sent to mx. Skipped. Original:\n%s\n" % str(debugcopy))
-#                                message.setStatus(message.MX_APP_ERROR)
+                            except:
+                                skp = dst
+                                log.error("Message not send to mx or error in the msgprocessor. Original:\n%s\n" % str(debugcopy))
+                                message.setStatus(message.MX_APP_ERROR)
                 else:
                     message.setStatus(message.BAD_DST)
 #            if message["status"] != 0:
