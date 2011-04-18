@@ -40,7 +40,8 @@ jQuery.fn.comments = function( blnDeep ) {
                 // Check to see if this node is a comment.
                 if (objChildNode.nodeType === 8 && objChildNode.nodeValue.substring(2, 0) == "@@") {
                     targets.push(objChildNode);
-                    entries.push($.parseJSON(objChildNode.nodeValue.replace(/^@@/, "")));
+                    var json = objChildNode.nodeValue.replace(/^@@/, "");
+                    entries.push($.parseJSON(json));
                 } else if (blnDeep && (objChildNode.nodeType === 1)) {
                     // Traverse this node deeply.
                     var res = $(objChildNode).comments(true);

@@ -21,7 +21,6 @@ class Imageserver:
         }
         self.__conn = MySQLdb.connect(host = "localhost", user = "imagserv", passwd = "sTj_7l", db = "spimgsrv")
         self.__cursor = self.__conn.cursor()
-        self.__folder = "/home/wera/spooce/db/imagefolder/"
         self.__url = "http://213.131.1.4/~wera/imageserver/"
 
     def __del__(self):
@@ -29,12 +28,9 @@ class Imageserver:
         self.__conn.close()
 
     def main(self, appid = "imgserv", arg = {}):
-        if arg.has_key("folder"):
-            self.__folder = arg["folder"]
         if arg.has_key("url"):
             self.__url = arg["url"]
         self.appid = appid
-        system("mkdir -p %s" % self.__folder)
 
     def depInfo(self):
         return {

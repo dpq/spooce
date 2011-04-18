@@ -2,6 +2,7 @@ if (!opt.package["menutree"]) {
     opt.package["menutree"] = {};
 }
 
+// "main()"
 opt.package["menutree"]["1"] = function() {
     var appid;
     var stringid = "";
@@ -10,7 +11,8 @@ opt.package["menutree"]["1"] = function() {
     var defaultRenderMode = "view";
     var renderMode;
 
-    var defaultServerAddress = "/smdc/smdcSatDB";
+    var defaultServerAddress = "/smdc/satellitedb";
+    var renderOptions = ["view", "edit"];
     var serverAddress;
 
     this.value = function() {
@@ -25,14 +27,19 @@ opt.package["menutree"]["1"] = function() {
         }
     };
 
+    this.onclick = null; // assing by user!
+
     this.mx = function(message, callback) {
         if (message.nodeid && message.value) {
             var node = document.getElementById(message.nodeid);
-            alert(node.className);
-            alert(node.className.strip("mtl"));
-            alert(parseInt(node.className.strip("mtl")));
-            var level = parseInt(node.className.strip("mtl"));
-            node.appendChild(this.renderTree(message.value, level));
+            var level = parseInt(node.className.slice(3));
+            //alert("Message : " + message.value);
+            for (i in message.value) {
+                //alert(i + " is " + message.value[i] + " TYPE IS " + typeof message.value[i]);
+                //alert(message.value[i][0] + " " + message.value[i][1]);
+                message.value[i] = message.value[i][0];
+            }
+            node.appendChild(this.renderTree(message.value, level + 1));
         }
         if (typeof callback == "function") {
             callback();
@@ -84,13 +91,26 @@ opt.package["menutree"]["1"] = function() {
 
     this.renderNode = function(nodeName) {
         var createdNode = document.createElement("div");
-        createdNode.id = nodeName
+        createdNode.id = nodeName;
+        if (this.targets[nodeName]) {
+            createdNode["target"] = [];
+            for (i in this.targets[nodeName]) {
+                //alert("Adding target :" + this.targets[nodeName][i]);
+                createdNode.target[i] = {};
+                createdNode.target[i]["app"] = this.targets[nodeName][i][0];
+                createdNode.target[i]["args"] = this.targets[nodeName][i][1];
+            }
+            createdNode.onclick = this.onclick;
+        }
         var spanInside = document.createElement("span");
         createdNode.appendChild(spanInside);
+        createdNode.ondblclick = function(e) {
+            alert("Double click on " + this.id);
+        }
         var strid = this.captions[nodeName] ? this.captions[nodeName] : nodeName;
         kernel.run(
                 {"appcode": "text", "versioncode": 1},
-                {"strid": strid, "mode": renderMode},
+                {"strid": strid, "mode": "view"}, //renderMode},
                 kernel.renderFactory($(spanInside))
         );
         return createdNode;
@@ -99,15 +119,20 @@ opt.package["menutree"]["1"] = function() {
     this.main = function(id, args) {
         appid = id;
         renderMode = args.mode ? args.mode : defaultRenderMode;
-        this.tree = args.tree ? args.tree : [];
-        this.captions = args.captions ? args.captions : {};
-        this.targets = args.targets ? args.targets : {};
+        if (args.handler) {
+            eval(args.handler);
+        }
+        var params = ["tree", "captions", "targets", "sources"];
+        for (param in params) {
+            this[params[param]] = args[params[param]] ? args[params[param]] : {};
+        }
         if (this.sources) {
             for (source in this.sources) {
-                kernel.subscribe(appid, this.sources[s], {"nodeid": source});
+                //alert(source + " : " + this.sources[source]);
+                kernel.subscribe(appid, this.sources[source], {"nodeid": source});
                 kernel.sendMessage({
                     "src"    : appid,
-                    "dst"    : this.sources[s],
+                    "dst"    : this.sources[source],
                     "nodeid" : source,
                     "action" : "list"
                 });
@@ -115,3 +140,7 @@ opt.package["menutree"]["1"] = function() {
         }
     };
 }
+
+/*
+Менюшка
+*/
