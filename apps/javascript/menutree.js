@@ -1,11 +1,11 @@
-if (!opt.package["menutree"]) {
-    opt.package["menutree"] = {};
+if (!opt.pkg.menutree) {
+    opt.pkg.menutree = {};
 }
 
-opt.package["menutree"]["1"] = function() {
+opt.pkg.menutree["1"] = function() {
     var appid;
     var stringid = "";
-    this.node;
+    this.node = {};
 
     var defaultRenderMode = "view";
     var renderMode;
@@ -28,10 +28,7 @@ opt.package["menutree"]["1"] = function() {
     this.mx = function(message, callback) {
         if (message.nodeid && message.value) {
             var node = document.getElementById(message.nodeid);
-            alert(node.className);
-            alert(node.className.strip("mtl"));
-            alert(parseInt(node.className.strip("mtl")));
-            var level = parseInt(node.className.strip("mtl"));
+            var level = parseInt(node.className.strip("mtl"), 10);
             node.appendChild(this.renderTree(message.value, level));
         }
         if (typeof callback == "function") {
@@ -84,7 +81,7 @@ opt.package["menutree"]["1"] = function() {
 
     this.renderNode = function(nodeName) {
         var createdNode = document.createElement("div");
-        createdNode.id = nodeName
+        createdNode.id = nodeName;
         var spanInside = document.createElement("span");
         createdNode.appendChild(spanInside);
         var strid = this.captions[nodeName] ? this.captions[nodeName] : nodeName;
@@ -114,4 +111,4 @@ opt.package["menutree"]["1"] = function() {
             }
         }
     };
-}
+};

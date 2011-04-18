@@ -1,11 +1,11 @@
-if (!opt.package["text"]) {
-    opt.package["text"] = {};
+if (!opt.pkg.text) {
+    opt.pkg.text = {};
 }
 
-opt.package["text"]["1"] = function() {
+opt.pkg.text["1"] = function() {
     var appid;
     var stringid = "";
-    this.node;
+    this.node = {};
 
     var defaultRenderMode = "view";
     var renderMode;
@@ -27,13 +27,13 @@ opt.package["text"]["1"] = function() {
 
     var renderOptions = {};
 
-    renderOptions["view"] = function() {
+    renderOptions.view = function() {
         var viewer = document.createTextNode(this.value());
         var TextInstance = this;
         return viewer;
     };
 
-    renderOptions["edit"] = function() {
+    renderOptions.edit = function() {
         var editor = document.createElement("textarea");
         var TextInstance = this;
         $(editor).keydown(function(e) {
@@ -63,7 +63,8 @@ opt.package["text"]["1"] = function() {
     };
 
     this.save = function() {
-        kernel.sendMessage({"action": "write", "value": this.value(), "src": appid, "dst": serverAddress, "strid": stringid});
+        kernel.sendMessage({"action": "write", "value": this.value(),
+        "src": appid, "dst": serverAddress, "strid": stringid});
     };
 
     this.mx = function(message, callback) {
@@ -76,7 +77,8 @@ opt.package["text"]["1"] = function() {
             }
         }
         if (message.mode && message.mode in renderOptions) {
-            this.node.parentNode.replaceChild(renderOptions[message.mode], this.node);
+            this.node.parentNode.replaceChild(renderOptions[message.mode],
+            this.node);
         }
         if (typeof callback == "function") {
             callback();
@@ -90,7 +92,8 @@ opt.package["text"]["1"] = function() {
 
         if ("strid" in args) {
             stringid = args.strid;
-            kernel.sendMessage({"src": appid, "dst": serverAddress, "strid": stringid, "action": "read"});
+            kernel.sendMessage({"src": appid, "dst": serverAddress,
+            "strid": stringid, "action": "read"});
             kernel.subscribe(appid, serverAddress, {"strid": stringid});
         }
     };

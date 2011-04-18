@@ -1,14 +1,14 @@
-if (!opt.package["image"]) {
-    opt.package["image"] = {};
+if (!opt.pkg.image) {
+    opt.pkg.image = {};
 }
 
-opt.package["image"]["1"] = function() {
+opt.pkg.image["1"] = function() {
     var appid;
     var imageid = "";
-    this.node;
-    this.image;
-    this.editor;
-    this.mask;
+    this.node = {};
+    this.image = {};
+    this.editor = {};
+    this.mask = {};
 
     var width;
     var height;
@@ -42,10 +42,15 @@ opt.package["image"]["1"] = function() {
         this.mask = document.createElement("div");
         this.editor = document.createElement("input");
         $(this.node).css({"width": width, "height": height});
-        $(this.image).css({"width": "100%", "height": "100%", "position" : "absolute"});
-        $(this.mask).css({"width": "100%", "height": "100%", "position" : "absolute", "background-color": "#888", "top": "0px", "left": "0px", "opacity": "0.75"});
+        $(this.image).css({"width": "100%", "height": "100%", 
+        "position" : "absolute"});
+        $(this.mask).css({"width": "100%", "height": "100%",
+        "position" : "absolute", "background-color": "#888", "top": "0px", 
+        "left": "0px", "opacity": "0.75"});
         this.editor.setAttribute("type", "text");
-        $(this.editor).css({"border":"2px solid white", "position" : "absolute", "height": "1.6em", "margin-left" : "auto", "margin-right" : "auto", "width": "20em"});
+        $(this.editor).css({"border":"2px solid white", "position" : "absolute",
+        "height": "1.6em", "margin-left" : "auto", "margin-right" : "auto",
+        "width": "20em"});
         var typeHint = "Insert an image url here...";
         this.editor.value = typeHint;
         var EditorInstance = this.editor;
@@ -80,17 +85,19 @@ opt.package["image"]["1"] = function() {
     };
 
     this.save = function() {
-        kernel.sendMessage({"action": "write", "url": this.editor.value, "src": appid, "dst": serverAddress, "imgid": imageid});
+        kernel.sendMessage({"action": "write", "url": this.editor.value,
+        "src": appid, "dst": serverAddress, "imgid": imageid});
     };
 
     this.mx = function(message, callback) {
-        if (message.imgid && message.imgid == imageid && message.url && message.url != "") {
+        if (message.imgid && message.imgid === imageid && message.url &&
+        message.url !== "") {
             this.image.setAttribute("src", message.url);
             this.node.style.width = message.width + "px";
             this.node.style.height = message.height + "px";
             this.editor.value = message.url;
         }
-        if (message.imgid && message.imgid == imageid && message.status != 0) {
+        if (message.imgid && message.imgid === imageid && message.status !== 0) {
             this.node.style.width = "256px";
             this.node.style.height = "64px";
             this.node.style.backgroundColor = "red";
@@ -117,7 +124,8 @@ opt.package["image"]["1"] = function() {
 
         if ("imgid" in args) {
             imageid = args.imgid;
-            kernel.sendMessage({"src": appid, "dst": serverAddress, "imgid": imageid, "action": "read"});
+            kernel.sendMessage({"src": appid, "dst": serverAddress,
+            "imgid": imageid, "action": "read"});
             kernel.subscribe(appid, serverAddress, {"imgid": imageid});
         }
     };
