@@ -65,17 +65,17 @@ class Opt:
         if not self.package[meta[0]].has_key(meta[1]):
             src = kernel.getSource(meta)
             if src != None:
-                try:
-#                if 1:
+#                try:
+                if 1:
                     module = imp.new_module(meta[0])
                     module.__dict__["kernel"] = kernel
                     module.__dict__["opt"] = opt
                     exec src in module.__dict__
                     sys.modules[meta[0]] = module
-                except:# Exception as error:
-                    log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
-                    #log.error(str(error))
-                    result = False
+#                except:# Exception as error:
+#                    log.error("Cannot build %s. Check the source code below\n%s" % (str(meta), src))
+#                    #log.error(str(error))
+#                    result = False
             else:
                 result = False
         else:
@@ -127,15 +127,17 @@ class Kernel:
         request = self.__url + "connect?tid=%s&key=%s" % (self.__ID, self.__KEY)
         result = {}
         self.messageCheckingTimer = 0.2
-        try:
+#        try:
+        if 1:
+            log.info("Connecting to hub...\n" + request)
             r = urlopen(request)
             content = r.read()
             r.close()
             result = eval(content.replace(": null", ": None"))
             # TODO: use simplejson to decode
-        except:
-            log.error("Cannot connect to hub." + "GET " + request)
-            return False
+#        except:
+#            log.error("Cannot connect to hub." + "GET " + request)
+#            return False
         log.info("Connecting result =")
         for r in result:
             log.info("\t" + str(r) + " : " + str(result[r]))
@@ -230,13 +232,13 @@ class Kernel:
             tm = "%.2f seconds" % secs
         elif secs < 3600:
             secs = int(secs)
-            tm = "minutes -- %s:%s" % (secs / 60.0, secs % 60)
+            tm = "minutes -- %s:%s" % (secs / 60, secs % 60)
         elif secs < 86400:
             secs = int(secs)
-            tm = "%s:%s:%s" % (str(secs / 3600), str((secs % 3600) / 60.0), str(secs % 60))
+            tm = "%s:%s:%s" % (str(secs / 3600), str((secs % 3600) / 60), str(secs % 60))
         else:
             secs = int(secs)
-            tm = "%s day(s) %s:%s:%s" % (secs / 86400, (secs % 86400) / 3600.0, (secs % 3600) / 60.0, secs % 60)
+            tm = "%s day(s) %s:%s:%s" % (secs / 86400, (secs % 86400) / 3600, (secs % 3600) / 60, secs % 60)
         print "====UPTIME ====", tm
         log.info("Mxdaemon woke up")
         if self.__stopFlag:
@@ -276,6 +278,7 @@ class Kernel:
         # Sending messages to local applications
         rejected, rereq = [], []
         while len(localmsg) > 0:
+            print len(localmsg), "message(s) left; Sending to mx of its dst..."
             message = Message(localmsg.pop())
             debugcopy = deepcopy(message)
             if message.has_key("msgid") and self.callbacks.has_key(message["msgid"]):

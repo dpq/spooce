@@ -14,8 +14,16 @@ import hashlib, hmac, secret, gzip, cStringIO, StringIO, zlib
 
 import secret, default
 
-Session, Board, Window = {}, {}, {}
+configfile = ""
+local = Local()
+local_manager = LocalManager([local])
 
+Session = local('Session')
+Board = local('Board')
+Window = local('Window')
+local.Session = {}
+local.Board = {}
+local.Window = {}
 
 Config = ConfigParser()
 Config.read("/etc/spooce/apps/infiniboard.cfg")
@@ -27,29 +35,31 @@ engine = create_engine("mysql+mysqldb://%s:%s@%s:%s/%s?charset=utf8&use_unicode=
 Base = declarative_base(bind=engine)
 Session = sessionmaker(bind=engine)
 
-Board = new.classobj("board", (Base, ), {
+def makeBoard(base):
+    return new.classobj("board", (base, ), {
     "__tablename__": 'board',
     "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-    "__init__": __Package_init__,
-    "__repr__": __Package_repr__,
-    "id": Column(DateTime()),
-    "uid": Column(Float()),
-    "access": Column(Integer())
+    "__init__": __Board_init__,
+    "__repr__": __Board_repr__,
+    "id": Column(Integer(), primary_key=True),
+    "uid": Column(Integer())
 })
 
-Window = new.classobj("window", (Base, ), {
+def makeWindow(base):
+    return = new.classobj("window", (base, ), {
     "__tablename__": 'window',
     "__table_args__": {'mysql_engine':'InnoDB', 'mysql_charset':'utf8'},
-    "__init__": __Package_init__,
-    "__repr__": __Package_repr__,
-    "id": Column(DateTime()),
-    "x": Column(Float()),
-    "y": Column(Float()),
-    "z": Column(Float()),
-    "width": Column(Float()),
-    "height": Column(Float()),
-    "meta": Column(String()),
-    "args": Column(String())
+    "__init__": __Window_init__,
+    "__repr__": __Window_repr__,
+    "id": Column(Integer(), primary_key=True),
+    "uid": Column(Integer()),
+    "x": Column(Integer()),
+    "y": Column(Integer()),
+    "z": Column(Ineger()),
+    "width": Column(Integer()),
+    "height": Column(Integer()),
+    "meta": Column(String(256)),
+    "args": Column(String(1024))
 })
 
 Base.metadata.create_all(engine)
@@ -57,7 +67,6 @@ Base.metadata.create_all(engine)
 
 import MySQLdb
 
-from mod_python import apache, Session, Cookie
 from urllib import urlopen, urlencode
 from base64 import b64encode
 from fpformat import fix

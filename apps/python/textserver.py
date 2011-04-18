@@ -135,19 +135,24 @@ class Textserver:
         return result
 
     def readTextFromDb(self, title):
-        try:
-            self.__cursor.execute("select value from texts where strid='%s'" % title)
-            return self.__cursor.fetchone()[0]
-        except:
+#        try:
+        if 1:
+            self.__cursor.execute("select value from texts where strid=%s", title)
+        result = self.__cursor.fetchone();
+        if result == None or len(result) == 0:
             return None
+        else:
+            return result[0]
+#        except:
+#            return None
 
     def putTextToDb(self, title, text):
         try:
             readtxt = self.readTextFromDb(title)
             if readtxt == None:
-                self.__cursor.execute("insert into texts set strid='%s', value='%s'", (title, unquote(text).encode("utf-8")))
+                self.__cursor.execute("insert into texts set strid=%s, value=%s", (title, unquote(text).encode("utf-8")))
             else:
-                self.__cursor.execute("update texts set value='%s' where strid='%s'" % (unquote(text).encode("utf-8"), title))
+                self.__cursor.execute("update texts set value=%s where strid=%s", (unquote(text).encode("utf-8"), title))
             print "Done writing"
         except:
             return False
