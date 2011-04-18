@@ -101,25 +101,6 @@ class Satellitedb:
         if action == "desc":
             channels = self.__convertToChannelHierarchy(self.getChannels(message)) # deletes restrictions from the message
             result = self.__createChannelsDescriptions(channels)
-        """RESPONSE:
-        action : data
-        src : /73b1395874c44c449ec97a6a6e244d45/ebf39ccf0573c335dfb3ca699a0d3ec5
-        dst : /smdc/satellitedb
-        msgid : 162
-        restrictions : {
-            u'channels': [u'668', u'671', u'672', u'706', u'707'],
-            u'dt_record': [[u'2010-11-01 00:00:00', u'2010-11-01 04:00:00']]}
-        restrictions {
-            u'dt_record': [[u'2010-11-01 00:00:00', u'2010-11-01 04:00:00']]}
-            chans [u'668', u'671', u'672', u'706', u'707']
-
-        Creating reqiests from channels : [u'668', u'671', u'672', u'706', u'707']
-        select sysname, satinstrument.name, channel.name, particle.name, minEnergy, maxEnergy, unit, comment from satellite, satinstrument, channel, particle where satellite.id=idSatellite and satinstrument.id=idInstrument and idParticle=particle.id and (channel.id='668' or channel.id='671' or channel.id='672' or channel.id='706' or channel.id='707')
-ERROR:root:Message not send to mx or error in the msgprocessor. Original:
-{u'action': u'data', u'src': u'/73b1395874c44c449ec97a6a6e244d45/ebf39ccf0573c335dfb3ca699a0d3ec5', u'dst': 
-u'/smdc/satellitedb', u'restrictions': {u'channels': [u'668', u'671', u'672', u'706', u'707'], u'dt_record': 
-[[u'2010-11-01 00:00:00', u'2010-11-01 04:00:00']]}, u'msgid': u'162'}"""
-
         if action in ["data", "graphic"]:
             result, boundaries, channels = self.getData(message["restrictions"]) # ["dt"] + channamesList, {dt : (tuple, of, data, for, channels) }
             if action == "graphic":
@@ -147,7 +128,7 @@ u'/smdc/satellitedb', u'restrictions': {u'channels': [u'668', u'671', u'672', u'
         if action == "data" or action == "graphic":
             message["value"] = result#, boundaries, channels # FOR DATA TESTING
             i, count = 0, len(result)
-            for r in result:#[:1]:
+            for r in result[:1]:
                 message["value"] = r
                 if i != count - 1:
                     print "index :", i, "length :", count
@@ -170,6 +151,8 @@ u'/smdc/satellitedb', u'restrictions': {u'channels': [u'668', u'671', u'672', u'
         return True
 
     def getSatellist(self):
+        if self.testmode:
+            return (("coronas-photon", "CORONAS-Photon"), ("tatyana2", "Tatyana-2"), ("meteorm", "Meteor-M#1"))
         print "select sysname from satellite;"
         self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
         self.__cursor = self.__conn.cursor()
@@ -426,12 +409,12 @@ u'/smdc/satellitedb', u'restrictions': {u'channels': [u'668', u'671', u'672', u'
             # REQUEST EXECUTING
             sqlRequest += whereCond
             minMaxRequest += whereCond
-            print "Next request :", sqlRequest
+            print "Next request :", sqlRequest 
             dt = datetime.now()
             try:
                 self.__cursor.execute(sqlRequest)
-            except Exception, e:
-                print e
+            except:# Exception, e:
+#                print e
                 print "bad request :("
                 return "", [], []
             all = self.__cursor.fetchall()

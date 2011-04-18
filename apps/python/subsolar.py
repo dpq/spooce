@@ -107,24 +107,25 @@ Location =  new.classobj("ace_coord", (Base, ), {
 Base.metadata.create_all(engine)
 
 
-RE = 6356
+RE = 6356 # The Earth Radius
 
 class SubSolar:
     def main(self, appid, args):
         self.appid = appid
         self.subsolarPictureFormat = """<?xml version="1.0" encoding="utf-8" ?>
-<picture title="" fontcolor="#804600" width="375" height="340" bgcolor="#ffffff">
-<grid title="%s" bgcolor="#ffffff" fgcolor="#ccccee" fontcolor="#000090" width="100%" height="100%" top="0"
-left="2%" offset="7%;7%">
-<axis id="utc" title="UT (ACE)" column="UT" type="datetime" min="%s" max="%s"
-steps="4" substeps="1" style="linear" direction="78%;0"> </axis>
- <axis title="R&lt;sub&gt;ss&lt;/sub&gt; [R&lt;sub&gt;E&lt;/sub&gt;]" column="" type="double" max="17" min="5"
-steps="6" substeps="2" style="linear" direction="0;80%"> </axis>
- <graphic column="Rss" fgcolor="#a00000" style="solid" createSubscript="no" title="" width="1" />
-</grid>
-</picture>""" # Last hour /Last 24 hours ; min data, max data
+            <picture title="" fontcolor="#804600" width="375" height="340" bgcolor="#ffffff">
+            <grid width="100%" height="100%" top="0" left="2%" offset="7%;7%" title="%s"
+             bgcolor="#ffffff" fgcolor="#ccccee" fontcolor="#000090" >
+                <axis id="utc" title="UT (ACE)" column="UT" type="datetime" min="%s" max="%s"
+                 steps="4" substeps="1" style="linear" direction="78%;0" />
+                <axis title="R&lt;sub&gt;ss&lt;/sub&gt; [R&lt;sub&gt;E&lt;/sub&gt;]" column="" type="double" max="17" min="5"
+                 steps="6" substeps="2" style="linear" direction="0;80%" />
+                <graphic column="Rss" fgcolor="#a00000" style="solid" createSubscript="no" title="" width="1" />
+            </grid>
+            </picture>""" # Last hour /Last 24 hours ; min data, max data
         self.dtformat = "%Y-%m-%d_%H:%M:%S"
 
+        print self.subsolarPictureFormat
         kernel.sendMessage({
             "action" : "add",
             "rule": "* * * * *",
