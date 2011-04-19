@@ -27,27 +27,26 @@ kernel.run = function(meta, args, callback) {
     if (! kernel.instFlag[meta.appcode]) {
         kernel.instFlag[meta.appcode] = {};
     }
+
     if (! kernel.instFlag[meta.appcode][meta.versioncode]) {
         kernel.instFlag[meta.appcode][meta.versioncode] = 1;
+        kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
         opt.install(meta, function() {
             kernel.instFlag[meta.appcode][meta.versioncode] = 2;
             kernel.run(meta, args, callback);
         });
-    }
-    else {
-        kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
-    }
-    if (kernel.instFlag[meta.appcode][meta.versioncode] == 2) {
+    }    
+    else if (kernel.instFlag[meta.appcode][meta.versioncode] === 2) {
         var i, j, appid, elem;
-        for (var i in kernel.runQueue[meta.appcode][meta.versioncode]) {
+        for (i = 0; i < kernel.runQueue[meta.appcode][meta.versioncode].length; i++) {
             elem = kernel.runQueue[meta.appcode][meta.versioncode][i];
             args = elem[0];
             callback = elem[1];
             appid = kernel.tid + "/";
-            for (j = 0; j<32; j++) {
+            for (j = 0; j < 32; j++) {
                 appid += "0123456789abcdef".charAt(Math.floor(Math.random()*16));
             }
-            kernel.process[appid] = new opt.package[meta.appcode][meta.versioncode]();
+            kernel.process[appid] = new opt.pkg[meta.appcode][meta.versioncode]();
             kernel.process[appid].__callback = {};
             kernel.process[appid].main(appid, args);
             kernel.sendMessage({"src": kernel.tid, "event": "run", "appid": appid});
@@ -205,7 +204,7 @@ kernel.unregister = function(email, callback) {
 kernel.mx = function() {
     var queueid = 0;
     var i;
-    for (i in kernel.backupQueue) {
+    for (i = 0; i < kernel.backupQueue.length; i++) {
         queueid++;
     }
     kernel.backupQueue[queueid] = $.extend(true, [], kernel.messageQueue);
@@ -222,7 +221,7 @@ kernel.mx = function() {
             if (typeof response != "object" || !(response instanceof Array)) {
                 return;
             }
-            for (i in response) {
+            for (i = 0; i < response.length; i++) {
                 message = response[i];
                 if (typeof message != "object") {
                     continue;
@@ -327,10 +326,10 @@ kernel.unsubscribe = function(subscriber, publisher) {
 
 /* OPT is the OPT Packaging Tool */
 var opt = {};
-opt.package = {};
+opt.pkg = {};
 
 opt.install = function(meta, callback) {
-    if (opt.package[meta.appcode] && opt.package[meta.appcode][meta.versioncode]) {
+    if (opt.pkg[meta.appcode] && opt.pkg[meta.appcode][meta.versioncode]) {
         callback();
         return;
     }
@@ -485,7 +484,7 @@ $(document).bind("ready", function() {
         var placeholders = $("body").comments(true);
         var targets = placeholders[0];
         var entries = placeholders[1];
-        for (var i in entries) {
+        for (var i = 0; i < entries.length; i++) {
             var meta = entries[i][0];
             var args = {};
             if (entries[i].length > 1) {
