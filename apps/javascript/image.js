@@ -1,8 +1,8 @@
-if (!opt.package["image"]) {
-    opt.package["image"] = {};
+if (!opt.pkg["image"]) {
+    opt.pkg["image"] = {};
 }
 
-opt.package["image"]["1"] = function() {
+opt.pkg["image"]["1"] = function() {
     var appid;
     var imageid = "";
     this.node;

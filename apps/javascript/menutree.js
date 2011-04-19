@@ -1,9 +1,9 @@
-if (!opt.package["menutree"]) {
-    opt.package["menutree"] = {};
+if (!opt.pkg["menutree"]) {
+    opt.pkg["menutree"] = {};
 }
 
 // "main()"
-opt.package["menutree"]["1"] = function() {
+opt.pkg["menutree"]["1"] = function() {
     var appid;
     var stringid = "";
     this.node;

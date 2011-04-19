@@ -1,8 +1,8 @@
-if (!opt.package["text"]) {
-    opt.package["text"] = {};
+if (!opt.pkg["text"]) {
+    opt.pkg["text"] = {};
 }
 
-opt.package["text"]["1"] = function() {
+opt.pkg["text"]["1"] = function() {
     var appid;
     var stringid = "";
     this.node;

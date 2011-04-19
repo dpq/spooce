@@ -1,11 +1,11 @@
-if (!opt.package["console"]) {
-    opt.package["console"] = {};
+if (!opt.pkg["console"]) {
+    opt.pkg["console"] = {};
 }
-if (!opt.package["console"]["1"]) {
-    opt.package["console"]["1"] = {};
+if (!opt.pkg["console"]["1"]) {
+    opt.pkg["console"]["1"] = {};
 }
 
-opt.package["console"]["1"] = function(appid, args) {
+opt.pkg["console"]["1"] = function(appid, args) {
     var appid;
     var stringid = "";
     this.node;
