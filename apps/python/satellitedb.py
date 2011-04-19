@@ -151,8 +151,8 @@ class Satellitedb:
         return True
 
     def getSatellist(self):
-        if self.testmode:
-            return (("coronas-photon", "CORONAS-Photon"), ("tatyana2", "Tatyana-2"), ("meteorm", "Meteor-M#1"))
+#        if self.testmode:
+#            return (("coronas-photon", "CORONAS-Photon"), ("tatyana2", "Tatyana-2"), ("meteorm", "Meteor-M#1"))
         print "select id, sysname from satellite;"
         self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
         self.__cursor = self.__conn.cursor()
