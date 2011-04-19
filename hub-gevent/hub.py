@@ -171,7 +171,7 @@ class Hub(object):
                 'hubid': '/%s' % self.hubid,
                 'repo': self.repos[random.randrange(len(self.repos))],
                 'warden': self.wardens[random.randrange(len(self.wardens))],
-                'calibration': {'interval': 200}})]
+                'calibration': {'interval': 1000}})]
         except:
             logging.error("__connect failure", exc_info=1)
             return [tojson({'status': 1, 'errmsg': 'An error has occured. Please contact tech support.'})]
@@ -193,7 +193,7 @@ class Hub(object):
         deadsubscriptions = []
         session.query(Subscription[domain]).filter(Subscription[domain].subscriber.op('regexp')('^/%s' % tid)).delete('fetch')
         for s in session.query(Subscription[domain]).filter(Subscription[domain].publisher.op('regexp')('^/%s' % tid)).all():
-            deadsubscriptions.append(s.subscriber, s.publisher)
+            deadsubscriptions.append([s.subscriber, s.publisher])
         session.query(Subscription[domain]).filter(Subscription[domain].publisher.op('regexp')('^/%s' % tid)).delete('fetch')
         session.commit()
         session.close()
@@ -219,7 +219,7 @@ class Hub(object):
             domain = self.__domain(req)
             session = Session[domain]()
             tid = self.__tid(req)
-            if not tid or session.query(Terminal[domain]).filter_by(tid=tid).count() != 1:
+            if not tid or session.query(Terminal[domain]).filter_by(tid=tid).count() != 1 or not locks.has_key(tid.encode('utf8')):
                 return [tojson({'status': 2, 'errmsg': 'Authentication error.'})]
             terminal = session.query(Terminal[domain]).filter_by(tid=tid).one()
             terminal.last_seen = datetime.now()
