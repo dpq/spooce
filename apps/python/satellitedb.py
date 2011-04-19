@@ -51,17 +51,10 @@ class Satellitedb:
             # CHECK if COORD FIELD EXISTS
             # CHECK if WE HAVE AT LEAST ONE TLE FOR THIS satellite
         }
-        self.testmode = 0
-        try:
-            self.__conn = MySQLdb.connect(host = "localhost", user = "satellitedb", passwd = "g78JH_FEk30", db = "satellitedb")
-            self.__cursor = self.__conn.cursor()
-        except:
-            print "Cannot connect to MySQL. Running in test mode"
-            self.testmode = 1
-
-    def __del__(self):
-        self.__cursor.close()
-        self.__conn.close()
+        self.__dbh = "localhost"
+        self.__dbu = "satellitedb"
+        self.__dbp = "g78JH_FEk30"
+        self.__dbn = "satellitedb"
 
     def main(self, appid = "satellitedb", arg = {}):
         self.appid = appid
@@ -158,17 +151,28 @@ class Satellitedb:
         return True
 
     def getSatellist(self):
-        if self.testmode:
-            return (("coronas-photon", "CORONAS-Photon"), ("tatyana2", "Tatyana-2"), ("meteorm", "Meteor-M#1"))
-        print "select sysname from satellite;"
+#        if self.testmode:
+#            return (("coronas-photon", "CORONAS-Photon"), ("tatyana2", "Tatyana-2"), ("meteorm", "Meteor-M#1"))
+        print "select id, sysname from satellite;"
+        self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
+        self.__cursor = self.__conn.cursor()
         self.__cursor.execute("select id, sysname from satellite;")
+        satlist = self.__cursor.fetchall()
+        self.__cursor.close()
+        self.__conn.close()
+        print "satellist", satlist
         # TODO: text server strings
-        return self.__cursor.fetchall()
+        return satlist
 
     def getSatellinfo(self, satName):
         print "select * from satellite where sysname='%s'" % satName
+        self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
+        self.__cursor = self.__conn.cursor()
         self.__cursor.execute("select * from satellite where sysname='%s'" % satName)
-        return self.__cursor.fetchall()
+        satinfo = self.__cursor.fetchall()
+        self.__cursor.close()
+        self.__conn.close()
+        return satinfo
 
     def __createConditionFromSet(self, intervals, nameMin, nameMax=None):
         if nameMax == None:
@@ -218,6 +222,8 @@ class Satellitedb:
         sqlRequest += ") and (" + self.__createConditionFromSet(map(lambda elem : (elem,), message.pop("channels")), "channel.name")
         sqlRequest += ") and (" + self.__createParticleSelect(message.pop("particles")) + ")"
         # (part, min, max); You can specify the same particle type more than once in different energy intervals
+        self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
+        self.__cursor = self.__conn.cursor()
         try:
             self.__cursor.execute(sqlRequest)
             print "EXECUTED SUCCESSFULLY"
@@ -225,8 +231,12 @@ class Satellitedb:
         except:
             print "CANNOT EXECUTE"
             print sqlRequest
+            self.__cursor.close()
+            self.__conn.close()
             return ()
         chans = self.__cursor.fetchall()
+        self.__cursor.close()
+        self.__conn.close()
         if len(chans) == 0 or chans[0] == None:
             print sqlRequest
             return ()
@@ -299,11 +309,27 @@ class Satellitedb:
         return result
 
     def __createReqs(self, chans):
-        reqs = {}
-        print "Creating reqiests from channels :", chans
-        print "select sysname, satinstrument.name, channel.name, particle.name, minEnergy, maxEnergy, unit, comment from satellite, satinstrument, channel, particle where satellite.id=idSatellite and satinstrument.id=idInstrument and idParticle=particle.id and (%s)" % " or ".join(map(lambda ids : " or ".join(map(lambda id : "channel.id='%s'" % id, ids.split("_"))), chans))
-        self.__cursor.execute("select sysname, satinstrument.name, channel.name, particle.name, minEnergy, maxEnergy, unit, comment from satellite, satinstrument, channel, particle where satellite.id=idSatellite and satinstrument.id=idInstrument and idParticle=particle.id and (%s)" % " or ".join(map(lambda ids : " or ".join(map(lambda id : "channel.id='%s'" % id, ids[4:].split("_"))), chans))) # .lstrip("chan")
-        info = self.__cursor.fetchall()
+        print "Creating requests from channels :", chans
+        request = '''select sysname, satinstrument.name, channel.name, particle.name, minEnergy, maxEnergy, unit, comment
+                     from satellite, satinstrument, channel, particle
+                     where satellite.id=idSatellite and satinstrument.id=idInstrument and idParticle=particle.id
+                        and (%s)''' % " or ".join(map(
+                            lambda ids : " or ".join(map(
+                                lambda id : "channel.id='%s'" % id,
+                                ids.split("_"))),
+                            chans))
+        info = ()
+        try:
+            self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
+            self.__cursor = self.__conn.cursor()
+            self.__cursor.execute(request)
+            info = self.__cursor.fetchall()
+            self.__cursor.close()
+            self.__conn.close()
+        except:
+            print ("ERROR IN EXECUTING:\n" + request)
+
+        reqs = {} # reqs = {"tbl" : {"chan" : {"unit" : "", "comment" : "", "particles" : ""}}}
         for inf in info: # CREATE TBL-CHANNEL association and channel descriptions
             sat, instr, chan, part, minE, maxE, unit, comment = inf # geomfactor and orientation?
             tbl = "pysatel.`%s_%s`" % (sat, instr)
@@ -376,6 +402,8 @@ class Satellitedb:
         chans = {}
         # GET DATA FROM EACH SATELLITE,..
             # ...FROM EACH INSTRUMENT
+        self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
+        self.__cursor = self.__conn.cursor()
         for req in requests:# self.__createReqs(chans): DO NOT UNCOMMENT BEFORE CHANGING CURRENT GROUP OF CHANNELS
             sqlRequest, minMaxRequest, newChans = req
             print "sqlRequest = %s\nminMaxRequest = %s\nnewChans = %s" % (sqlRequest, minMaxRequest, str(newChans))
@@ -388,7 +416,8 @@ class Satellitedb:
             dt = datetime.now()
             try:
                 self.__cursor.execute(sqlRequest)
-            except:
+            except:# Exception, e:
+#                print e
                 print "bad request :("
                 return "", [], []
             all = self.__cursor.fetchall()
@@ -430,6 +459,8 @@ class Satellitedb:
                     max(minmaxes[1], max(mmrow[currchanlen + 1:]))
                 ]
             offset = len(chans)
+        self.__cursor.close()
+        self.__conn.close()
         dtkeys = sorted(result.keys())
         minmaxes.append(dtkeys[0])
         minmaxes.append(dtkeys[-1])
@@ -555,6 +586,8 @@ class Satellitedb:
         satmodule = {}
         exec satInfo in satmodule
         satname = satmodule["desc"]()["name"]
+        self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
+        self.__cursor = self.__conn.cursor()
         try:
             self.__cursor.execute("insert into satellite set sysname='%s';" % satname)
         except:
@@ -591,6 +624,8 @@ class Satellitedb:
                     except:
                         print "insert into channel(name,idSatellite,idInstrument,isprivate,geomfactor,idParticle,minEnergy,maxEnergy,unit,comment) values (%s, %i, %i, %i, %f, %i, %s, %s, %s, %s)", (chname, satid, instid, isprivate, geomfactor, parttype, min, max, unit, comment)
             print i, "added successfully"
+        self.__cursor.close()
+        self.__conn.close()
         print "Done", pathToTelemetry
 
     def channelinfo(self, ch):
@@ -617,7 +652,7 @@ class Satellitedb:
             "particles" : particles,
             "unit" : unit,
             "geomfactor" : geomfactor,
-            "comment" : comment,
+            "comment" : comment + ", ",
             "isprivate" : isprivate
         }
 
@@ -635,7 +670,7 @@ class Satellitedb:
                 result += " %s - %s" % (goodPrecision(p[1]), goodPrecision(p[2]))
 #            if chanInfo.has_key("unit") and chanInfo["unit"] != None and chanInfo["unit"] != "":
             result += " " + chanInfo["unit"] + ", "
-        return result[:-2] + chanInfo["comment"] # deletes the last ","
+        return (result + chanInfo["comment"])
 
 def getElem(elemList, attrName, attrValue):
     for elem in elemList:

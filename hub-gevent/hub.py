@@ -225,6 +225,9 @@ class Hub(object):
             terminal.last_seen = datetime.now()
             session.commit()
             session.close()
+            if not locks.has_key(tid.encode('utf8')):
+                logging.warning('Terminal %s not registered in the system. Vacuum the DB.' % tid)
+                return [tojson({'status': 2, 'errmsg': 'Authentication error (vacuum the db).'})]
             locks[tid.encode('utf8')].acquire()
             self.mc.set("%s_last_seen" % tid.encode('utf8'), str(datetime.now()))
             locks[tid.encode('utf8')].release()

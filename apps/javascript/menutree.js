@@ -1,12 +1,12 @@
-if (!opt.pkg["menutree"]) {
-    opt.pkg["menutree"] = {};
+if (!opt.pkg.menutree) {
+    opt.pkg.menutree = {};
 }
 
 // "main()"
-opt.pkg["menutree"]["1"] = function() {
+opt.pkg.menutree["1"] = function() {
     var appid;
     var stringid = "";
-    this.node;
+    this.node = {};
 
     var defaultRenderMode = "view";
     var renderMode;
@@ -32,14 +32,8 @@ opt.pkg["menutree"]["1"] = function() {
     this.mx = function(message, callback) {
         if (message.nodeid && message.value) {
             var node = document.getElementById(message.nodeid);
-            var level = parseInt(node.className.slice(3));
-            //alert("Message : " + message.value);
-            for (i in message.value) {
-                //alert(i + " is " + message.value[i] + " TYPE IS " + typeof message.value[i]);
-                //alert(message.value[i][0] + " " + message.value[i][1]);
-                message.value[i] = message.value[i][0];
-            }
-            node.appendChild(this.renderTree(message.value, level + 1));
+            var level = parseInt(node.className.strip("mtl"), 10);
+            node.appendChild(this.renderTree(message.value, level));
         }
         if (typeof callback == "function") {
             callback();
@@ -139,8 +133,4 @@ opt.pkg["menutree"]["1"] = function() {
             }
         }
     };
-}
-
-/*
-Менюшка
-*/
+};
