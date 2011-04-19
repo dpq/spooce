@@ -153,14 +153,16 @@ class Satellitedb:
     def getSatellist(self):
         if self.testmode:
             return (("coronas-photon", "CORONAS-Photon"), ("tatyana2", "Tatyana-2"), ("meteorm", "Meteor-M#1"))
-        print "select sysname from satellite;"
+        print "select id, sysname from satellite;"
         self.__conn = MySQLdb.connect(host = self.__dbh, user = self.__dbu, passwd = self.__dbp, db = self.__dbn)
         self.__cursor = self.__conn.cursor()
         self.__cursor.execute("select id, sysname from satellite;")
+        satlist = self.__cursor.fetchall()
         self.__cursor.close()
         self.__conn.close()
+        print "satellist", satlist
         # TODO: text server strings
-        return self.__cursor.fetchall()
+        return satlist
 
     def getSatellinfo(self, satName):
         print "select * from satellite where sysname='%s'" % satName
