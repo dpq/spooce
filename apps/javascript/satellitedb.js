@@ -128,9 +128,9 @@ opt.package["satellitedb"]["1"] = function() {
     };
 
     /*********************************   Other Functions   *******************************/
-    this.createDateSelector = function() {
-        var dts = document.createElement("div");
-//        return dts
-    };
+    /*this.createDateSelector = function() {
+        vardocument.createElement("select");
+        document.
+    };*/
 
 }
