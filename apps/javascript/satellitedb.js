@@ -1,8 +1,8 @@
-if (!opt.package["satellitedb"]) {
-    opt.package["satellitedb"] = {};
+if (!opt.pkg["satellitedb"]) {
+    opt.pkg["satellitedb"] = {};
 }
 
-opt.package["satellitedb"]["1"] = function() {
+opt.pkg["satellitedb"]["1"] = function() {
     var appid;
     this.node;
     var defaultServerAddress = "/smdc/satellitedb";
