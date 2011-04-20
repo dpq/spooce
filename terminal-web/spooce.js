@@ -27,47 +27,54 @@ opt.pkg = {};
 
 kernel.renderFactory = function(target) {
   return function(appid) {
-    var element = kernel.process[appid].render(target.parentNode);
-    target.parentNode.replaceChild(element, target);
+    var parent = typeof target.parent == "function" ? target.parent()[0] : target.parentNode;
+    var element = kernel.process[appid].render(parent);
+    if (target instanceof jQuery) {
+        target = target[0];
+    }
+    parent.replaceChild(element, target);
     kernel.element[appid] = element;
   };
 };
 
 kernel.run = function(meta, args, callback) {
-    if (! kernel.runQueue[meta.appcode]) {
-        kernel.runQueue[meta.appcode] = {};
-    }
-    if (! kernel.runQueue[meta.appcode][meta.versioncode]) {
-        kernel.runQueue[meta.appcode][meta.versioncode] = [];
-    }
-    if (! kernel.instFlag[meta.appcode]) {
-        kernel.instFlag[meta.appcode] = {};
-    }
+  if (! kernel.runQueue[meta.appcode]) {
+    kernel.runQueue[meta.appcode] = {};
+    kernel.instFlag[meta.appcode] = {};
+  }
+  if (! kernel.runQueue[meta.appcode][meta.versioncode]) {
+    kernel.runQueue[meta.appcode][meta.versioncode] = [];
+    kernel.instFlag[meta.appcode][meta.versioncode] = 0;
+  }
 
-    if (! kernel.instFlag[meta.appcode][meta.versioncode]) {
-        kernel.instFlag[meta.appcode][meta.versioncode] = 1;
-        kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
-        opt.install(meta, function() {
-            kernel.instFlag[meta.appcode][meta.versioncode] = 2;
-            kernel.run(meta, args, callback);
-        });
-    }    
-    else if (kernel.instFlag[meta.appcode][meta.versioncode] === 2) {
-        var i, j, appid, elem;
-        for (i = 0; i < kernel.runQueue[meta.appcode][meta.versioncode].length; i++) {
-            elem = kernel.runQueue[meta.appcode][meta.versioncode][i];
-            args = elem[0];
-            callback = elem[1];
-            appid = kernel.tid + "/";
-            for (j = 0; j < 32; j++) {
-                appid += "0123456789abcdef".charAt(Math.floor(Math.random()*16));
-            }
-            kernel.process[appid] = new opt.pkg[meta.appcode][meta.versioncode]();
-            kernel.process[appid].__callback = {};
-            kernel.process[appid].main(appid, args);
-            kernel.sendMessage({"src": kernel.tid, "event": "run", "appid": appid});
-            callback(appid);
-        }
+  if (! kernel.instFlag[meta.appcode][meta.versioncode]) {
+    kernel.instFlag[meta.appcode][meta.versioncode] = 1;
+    kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
+    opt.install(meta, (function(meta, args, callback) {
+      return function() {
+        kernel.instFlag[meta.appcode][meta.versioncode] = 2;
+        kernel.run(meta, args, callback);
+      };
+    })(meta, args, callback));
+  }
+  else if (kernel.instFlag[meta.appcode][meta.versioncode] === 1) {
+      kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
+  }
+  else if (kernel.instFlag[meta.appcode][meta.versioncode] === 2) {
+    var appid, elem;
+    for (var i = 0; i < kernel.runQueue[meta.appcode][meta.versioncode].length; i++) {
+      elem = kernel.runQueue[meta.appcode][meta.versioncode].shift();
+      args = elem[0];
+      callback = elem[1];
+      appid = kernel.tid + "/";
+      for (var j = 0; j < 32; j++) {
+        appid += "0123456789abcdef".charAt(Math.floor(Math.random()*16));
+      }
+      kernel.process[appid] = new opt.pkg[meta.appcode][meta.versioncode]();
+      kernel.process[appid].__callback = {};
+      kernel.process[appid].main(appid, args);
+      kernel.sendMessage({"src": kernel.tid, "event": "run", "appid": appid});
+      callback(appid);
     }
   }
 };
