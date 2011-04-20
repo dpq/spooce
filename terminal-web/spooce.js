@@ -27,8 +27,12 @@ opt.pkg = {};
 
 kernel.renderFactory = function(target) {
   return function(appid) {
-    var element = kernel.process[appid].render(target.parentNode);
-    target.parentNode.replaceChild(element, target);
+    var parent = typeof target.parent == "function" ? target.parent()[0] : target.parentNode;
+    var element = kernel.process[appid].render(parent);
+    if (target instanceof jQuery) {
+        target = target[0];
+    }
+    parent.replaceChild(element, target);
     kernel.element[appid] = element;
   };
 };
@@ -36,27 +40,30 @@ kernel.renderFactory = function(target) {
 kernel.run = function(meta, args, callback) {
   if (! kernel.runQueue[meta.appcode]) {
     kernel.runQueue[meta.appcode] = {};
+    kernel.instFlag[meta.appcode] = {};
   }
   if (! kernel.runQueue[meta.appcode][meta.versioncode]) {
     kernel.runQueue[meta.appcode][meta.versioncode] = [];
+    kernel.instFlag[meta.appcode][meta.versioncode] = 0;
   }
-  if (! kernel.instFlag[meta.appcode]) {
-    kernel.instFlag[meta.appcode] = {};
-  }
+
   if (! kernel.instFlag[meta.appcode][meta.versioncode]) {
     kernel.instFlag[meta.appcode][meta.versioncode] = 1;
-    opt.install(meta, function() {
-      kernel.instFlag[meta.appcode][meta.versioncode] = 2;
-      kernel.run(meta, args, callback);
-    });
-  }
-  else {
     kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
+    opt.install(meta, (function(meta, args, callback) {
+      return function() {
+        kernel.instFlag[meta.appcode][meta.versioncode] = 2;
+        kernel.run(meta, args, callback);
+      };
+    })(meta, args, callback));
   }
-  if (kernel.instFlag[meta.appcode][meta.versioncode] === 2) {
+  else if (kernel.instFlag[meta.appcode][meta.versioncode] === 1) {
+      kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
+  }
+  else if (kernel.instFlag[meta.appcode][meta.versioncode] === 2) {
     var appid, elem;
-    for (var i = 0; i < kernel.runQueue[meta.appcode][meta.versioncode]; i++) {
-      elem = kernel.runQueue[meta.appcode][meta.versioncode][i];
+    for (var i = 0; i < kernel.runQueue[meta.appcode][meta.versioncode].length; i++) {
+      elem = kernel.runQueue[meta.appcode][meta.versioncode].shift();
       args = elem[0];
       callback = elem[1];
       appid = kernel.tid + "/";

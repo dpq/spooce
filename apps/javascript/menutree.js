@@ -5,26 +5,13 @@ if (!opt.pkg.menutree) {
 // "main()"
 opt.pkg.menutree["1"] = function() {
     var appid;
-    var stringid = "";
     this.node = {};
 
-    var defaultRenderMode = "view";
-    var renderMode;
-
     var defaultServerAddress = "/smdc/satellitedb";
-    var renderOptions = ["view", "edit"];
     var serverAddress;
 
     this.value = function() {
-        if (!this.node) {
-            return "";
-        }
-        if (renderMode == "edit") {
-            return this.node.value;
-        }
-        else if (renderMode == "view") {
-            return this.node.data;
-        }
+       return this.node.data;
     };
 
     this.onclick = null; // assing by user!
@@ -32,7 +19,7 @@ opt.pkg.menutree["1"] = function() {
     this.mx = function(message, callback) {
         if (message.nodeid && message.value) {
             var node = document.getElementById(message.nodeid);
-            var level = parseInt(node.className.strip("mtl"), 10);
+            var level = parseInt(node.className.replace("mtl", ""), 10);
             node.appendChild(this.renderTree(message.value, level));
         }
         if (typeof callback == "function") {
@@ -40,10 +27,7 @@ opt.pkg.menutree["1"] = function() {
         }
     };
     
-    this.render = function(mode) {
-        if (!mode || !(mode in renderOptions)) {
-            mode = renderMode;
-        }
+    this.render = function() {
         return this.renderTree(this.tree, 0);
     };
 
@@ -104,15 +88,13 @@ opt.pkg.menutree["1"] = function() {
         var strid = this.captions[nodeName] ? this.captions[nodeName] : nodeName;
         kernel.run(
                 {"appcode": "text", "versioncode": 1},
-                {"strid": strid, "mode": "view"}, //renderMode},
-                kernel.renderFactory($(spanInside))
+                {"strid": strid, "mode": "view"}, kernel.renderFactory($(spanInside))
         );
         return createdNode;
     };
 
     this.main = function(id, args) {
         appid = id;
-        renderMode = args.mode ? args.mode : defaultRenderMode;
         if (args.handler) {
             eval(args.handler);
         }
