@@ -25,14 +25,16 @@ kernel.runQueue = {};
 var opt = {};
 opt.pkg = {};
 
-kernel.renderFactory = function(target) {
+kernel.renderFactory = function(target, isReplace) {
   return function(appid) {
-    var parent = typeof target.parent == "function" ? target.parent()[0] : target.parentNode;
     var element = kernel.process[appid].render(parent);
-    if (target instanceof jQuery) {
-        target = target[0];
+    if (isReplace) {
+        var parent = target.parentNode;
+        parent.replaceChild(element, target);
     }
-    parent.replaceChild(element, target);
+    else {
+        target.appendChild(element);
+    }
     kernel.element[appid] = element;
   };
 };
@@ -61,6 +63,7 @@ kernel.run = function(meta, args, callback) {
       kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
   }
   else if (kernel.instFlag[meta.appcode][meta.versioncode] === 2) {
+    kernel.runQueue[meta.appcode][meta.versioncode].push([args, callback]);
     var appid, elem;
     for (var i = 0; i < kernel.runQueue[meta.appcode][meta.versioncode].length; i++) {
       elem = kernel.runQueue[meta.appcode][meta.versioncode].shift();
@@ -521,7 +524,7 @@ $(document).bind("ready", function() {
       if (entries[i].length > 1) {
         args = entries[i][1];
       }
-      kernel.run(meta, args, kernel.renderFactory(targets[i]));
+      kernel.run(meta, args, kernel.renderFactory(targets[i], true));
     }
   });
   $(window).bind("unload", function() {

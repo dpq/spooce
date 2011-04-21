@@ -34,7 +34,7 @@ opt.pkg.image["1"] = function() {
     };
 
     this.render = function(mode) {
-        if (!mode || !(mode in renderOptions)) {
+        if (!mode) {
             mode = renderMode;
         }
         this.node = document.createElement("div");

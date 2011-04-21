@@ -80,15 +80,16 @@ opt.pkg.menutree["1"] = function() {
             }
             createdNode.onclick = this.onclick;
         }
-        var spanInside = document.createElement("span");
-        createdNode.appendChild(spanInside);
+        //var spanInside = document.createElement("span");
+        //createdNode.appendChild(spanInside);
         createdNode.ondblclick = function(e) {
             alert("Double click on " + this.id);
         }
         var strid = this.captions[nodeName] ? this.captions[nodeName] : nodeName;
         kernel.run(
                 {"appcode": "text", "versioncode": 1},
-                {"strid": strid, "mode": "view"}, kernel.renderFactory($(spanInside))
+                {"strid": strid, "mode": "view"}, kernel.renderFactory(createdNode)
+//                {"strid": strid, "mode": "view"}, kernel.renderFactory($(spanInside))
         );
         return createdNode;
     };
